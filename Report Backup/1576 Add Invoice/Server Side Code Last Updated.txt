@@ -1,0 +1,1002 @@
+Imports kWHTML.Elements
+Imports WebManagement
+Imports kWHTML.kWForms
+Imports System.Text
+Imports kWHTML
+
+Namespace kWatchServer.invInvoices
+    ''' <summary>"
+    ''' Define all custom code for this assembly within this class 
+    ''' </summary>
+    ''' <remarks></remarks>
+    Public Class WEBHTMLADD_kWItems
+        Implements WebForm
+#Region "Variables & Properties"
+        Public DefaultIssueToID As String
+        Public DefaultIssueToPaymentAccountID As String
+        Public DefaultOpenItem
+        Private prvOfficeID As String
+        Public DIssueToPaymentAccountID As String = ""
+        Public Property OfficeID As String
+        Public Property MastCatID As String = ""
+#End Region
+#Region "Form(Page) & Load Methods"
+
+        ''' <summary>
+        ''' Main function that is returned to the lines of the report when it is ran
+        ''' </summary>
+        ''' <param name="html"></param>
+        ''' <remarks></remarks>
+        Public Sub GetReport(html As HTMLTextWriterkWatch) Implements WebForm.GetReport
+            Dim repBase = GetReportBase()
+            repBase.ToString(html)
+        End Sub
+
+        Public Function GetReportBase() As HTMLkWFormBase Implements WebForm.GetReportBase
+
+            Dim Form = HTMLkWFormBase.Create(Me)
+            Form.onLoadFormBase = "onLoadFormBase1576"  'make sure this matches the onLoadFormBase name
+            Form.JScript.Add(My.Resources.ClientScript)
+            Form.FormHeader.FormName = "Add Invoice"
+            If ItemReferenceObject() Is Nothing Then
+                Form.FormSectionMain.Add(New HTMLText("Report Design Cannot Be Added From This Location"))
+                Return Form
+            End If
+            GetAllControlsAddInvoice(Form)
+            Form.ScriptFunctionCallCodeObjectAdd(Function(c) c.GetCategoriesHtml(String.Empty))
+            Form.ScriptFunctionCallCodeObjectAdd(Function(c) c.InvoiceDivHideShow(String.Empty, String.Empty))
+            Form.ScriptFunctionCallCodeObjectAdd(Function(c) c.AddPaymentAccount(String.Empty))
+            Form.ScriptFunctionCallCodeObjectAdd(Function(c) c.AddCompanydetails(String.Empty))
+            Form.ScriptFunctionCallCodeObjectAdd(Function(c) c.GetFilterSection(String.Empty, String.Empty))
+            Form.ScriptFunctionCallCodeObjectAdd(Function(c) c.AddInvoice(Nothing))
+            Form.ScriptFunctionCallCodeObjectAdd(Function(c) c.GetInvoiceMasterCategoriesReturn(Nothing))
+            Return Form
+        End Function
+        ''' <summary>
+        ''' This is the function that is called when you need to refresh the form base object
+        ''' </summary>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Function RefreshFormBase() As String Implements WebForm.RefreshFormBase
+            'Get the report
+            Dim repBase As HTMLkWFormBase(Of WEBHTMLADD_kWItems) = GetReportBase()
+            repBase.RefreshPageCall = True
+            Dim html As New HTMLTextWriterkWatch
+            repBase.ToString(html)
+            Return html.ToString
+        End Function
+#End Region
+#Region "Get All Controls"
+        Public Sub GetAllControlsAddInvoice(form As HTMLkWFormBase(Of WEBHTMLADD_kWItems))
+            Dim LongID As String = getObject.LongID
+            form.FormSectionMain.Add(GetBusinessUnitSelection())
+            'Invoice Amount
+            Dim Amount = kWHTMLElementInputNumber.CreateDirect(Me, "Amount", 0)
+            Amount.ClassName = "form-control"
+            Amount.LabelString = "Invoice Amount (Inc GST)"
+            Amount.ID = "Amount"
+            Amount.DecimalPlaces = 2
+            Amount.NumberType = HTMLElementInputNumber.NumberTypes.currency
+            form.FormSectionMain.Add(Amount)
+            'ISSUE TO
+            Dim Divissue As New HTMLElementDIV
+            Divissue.ID = "Divissue"
+            Divissue.Controls.Add(IssuesToCompany(LongID))
+            Divissue.Controls.Add(TargetReportDefRun(LongID))
+            form.FormSectionMain.Add("Issued To", Divissue)
+            Dim divpaymentAccount = New HTMLElementDIV(FilterSection(LongID, OfficeID))
+            divpaymentAccount.ID = "InvoiceDiv"
+            form.FormSectionMain.Add("Payment Account", divpaymentAccount)
+            'Invoice From
+            Dim InvFromAsPaidTo = kWHTMLElementInputSelect.CreateDirect(Me, "Default", "InvFromAsPaidTo", InvoiceFrom)
+            InvFromAsPaidTo.LabelString = "Invoice From"
+            InvFromAsPaidTo.SortOptions = False
+            form.FormSectionMain.Add(InvFromAsPaidTo)
+            InvFromAsPaidTo.onAfterUpdateEvent.onAfterTriggerFunctionName = "Invoicefromspecify"
+            InvFromAsPaidTo.NothingInclude = False
+            Dim DivInvoiceDrp = New HTMLElementDIV()
+            DivInvoiceDrp.ID = "InvoiceFromDrp"
+            DivInvoiceDrp.Controls.Add(SpecifyFromdrp(LongID, String.Empty))
+            form.FormSectionMain.Add("Specify ", DivInvoiceDrp)
+            Dim Invoicecategory = New HTMLElementDIV(GetInvoiceMasterCategories(OfficeID))
+            Invoicecategory.ID = "Invoicecategory"
+            form.FormSectionMain.Add("Invoice Category", Invoicecategory)
+            'GetCategoriesList
+            Dim InvoiceDivSubCategory = New HTMLElementDIV(GetCategories(Nothing))
+            If divpaymentAccount.Controls.Count > 0 Then
+                InvoiceDivSubCategory.ID = "InvoiceDivSubCategory"
+                form.FormSectionMain.Add("Sub Invoice Category", InvoiceDivSubCategory)
+            End If
+            Dim GSTCode = kWHTMLElementInputSelect.CreateDirect(Me, 0, "GSTCode", GetType(invGSTCodeSupplies))
+            GSTCode.Value = invGSTCodeSupplies.G6TaxableSupplies
+            GSTCode.LabelString = "GST Code "
+            GSTCode.NothingInclude = False
+            form.FormSectionMain.Add(GSTCode)
+            'Invoice Details
+            Dim InvoiceDetails = kWHTMLElementInputText.CreateDirect(Me, "InvoiceDetails", String.Empty)
+            InvoiceDetails.ClassName = "form-control"
+            InvoiceDetails.LabelString = "Invoice Details "
+            form.FormSectionMain.Add(InvoiceDetails)
+            'Purchase Details
+            Dim PurchaseHeading = New HTMLElementH4("Purchase Details")
+            PurchaseHeading.FontWeight = FontWeight.bold
+            form.FormSectionMain.Add(PurchaseHeading)
+            Dim DivDateissue = New HTMLElementDIV
+            DivDateissue.ID = "DivDateControls"
+            DivDateissue.Controls.Add(DateDivIssue)
+            form.FormSectionMain.Add("Date Issued To", DivDateissue)
+            Dim DivDateInvoice = New HTMLElementDIV
+            DivDateInvoice.ID = "DivDateControls"
+            DivDateInvoice.Controls.Add(DateDivInvoice)
+            form.FormSectionMain.Add("Date Invoice Due", DivDateInvoice)
+            'Add Invoice
+            Dim BtnAddInvoice = kWHTMLElementButton.Create(Me, "Add Invoice")
+            BtnAddInvoice.ID = "BtnAddInvoice"
+            BtnAddInvoice.ClassName = "btn btn-primary btn-md"
+            form.FormSectionMain.Add(BtnAddInvoice)
+            BtnAddInvoice.onClickEvent.onBeforeTriggerFunctionName = "BeforeAddClick"
+            BtnAddInvoice.onClickEvent.eventDelegate = Function(c) c.AddInvoice(Nothing)
+            BtnAddInvoice.onClickEvent.onAfterTriggerFunctionName = "AfterAddClick"
+            'Open Item
+            Dim ChkOpenItemCheckbox = kWHTMLElementInputCheckBox.CreateDirect(Me, False, "OpenItem")
+            ChkOpenItemCheckbox.LabelString = "Open Item"
+            ChkOpenItemCheckbox.placeholder = String.Empty
+            form.FormSectionMain.Add(ChkOpenItemCheckbox)
+        End Sub
+#End Region
+#Region "Data Functions"
+        Public Function GetInvoiceMasterCategoriesReturn(OfficeIDLocal) As kWControlEventReturnInfo
+            Try
+                Return New kWControlEventReturnInfo With {.success = True, .returnData = GetInvoiceMasterCategories(OfficeIDLocal).ToString}
+            Catch ex As Exception
+                Return New kWControlEventReturnInfo With {.success = False, .returnMessage = "Failed Due To :" & ex.ToString}
+            End Try
+        End Function
+        Public Function DateDivIssue() As HTMLElementDIV
+            Dim DivDate As New HTMLElementDIV
+            Dim IssueDate = kWHTMLElementInputCalendar.CreateDirect(Me, Date.Now, "IssueDate")
+            IssueDate.LabelDisplay = False
+            DivDate.Controls.Add(IssueDate)
+            Return DivDate
+        End Function
+        Public Function DateDivInvoice() As HTMLElementDIV
+            Dim InvoiceDate As New HTMLElementDIV
+            Dim DateDue = kWHTMLElementInputCalendar.CreateDirect(Me, Date.Now.AddDays(14).ToString, "DateDue")
+            DateDue.LabelDisplay = False
+            InvoiceDate.Controls.Add(DateDue)
+            Return InvoiceDate
+        End Function
+        Public Function ItemReferenceObject() As kWItem
+            If Len(Me.User.Company.LongID) > 0 Then
+                Dim LongID = Me.User.Company.LongID
+                Return Me.User.Get_Item_Object(LongID).ClassObject
+            End If
+            Return Nothing
+        End Function
+        Public Function InvoiceDivHideShow(LongID As String, Invoicefromvalue As String) As kWControlEventReturnInfo
+            Try
+                Return New kWControlEventReturnInfo With {.success = True, .returnData = SpecifyFromdrp(LongID, Invoicefromvalue).ToString}
+            Catch ex As Exception
+                Return New kWControlEventReturnInfo With {.success = True, .returnData = ex.Message}
+            End Try
+        End Function
+        Public Function getObject() As Object
+            If Len(Me.SetUpObject.ClassObject.Issued_To_Ids) > 0 Then
+                Dim LongID = Me.SetUpObject.ClassObject.Issued_To_Ids
+                Return Me.User.Get_Item_Object(LongID).ClassObject
+            End If
+            Return Nothing
+        End Function
+        Public Function SpecifyFromdrp(LongID As String, Selectedvalue As String) As HTMLElementDIV
+            Dim DivDrp As New HTMLElementDIV
+            If Selectedvalue.Equals("Specify") Then
+                Dim LongID2 As String = getObject.LongID
+                Dim SpecifyDrp = KWSelectItem.CreateDirect(Me, {utlClassType.utlClassTypeCompany, utlClassType.utlClassTypeContact}, "SpecifyDrp", LongID2)
+                SpecifyDrp.LabelString = ""
+                DivDrp.Controls.Add(SpecifyDrp)
+            End If
+            Return DivDrp
+        End Function
+        Public Function IssuesToCompany(LongID As String) As HTMLElementDIV
+            Dim DivIssueToCompany As New HTMLElementDIV
+            Dim IssuedTo = KWSelectItem.CreateDirect(Me, {utlClassType.utlClassTypeCompany, utlClassType.utlClassTypeContact}, "IssuedTo", LongID)
+            IssuedTo.LabelString = "Issued To"
+            IssuedTo.LabelDisplay = False
+            IssuedTo.onAfterUpdateEvent.onAfterTriggerFunctionName = "ToggleCodeSelection"
+            DivIssueToCompany.Controls.Add(IssuedTo)
+            Return DivIssueToCompany
+        End Function
+        Public Function TargetReportDefRun(LongId As String) As HTMLElementDIV
+            Dim DivReportItem As New HTMLElementDIV
+            Dim Items = New kWatchServer.kWItems
+            Dim SetUp = New kWatchServer.comCompanySetup
+            SetUp.Company_IDs = "0"
+            Items.Initialize(Me.User, CObj(SetUp))
+            Dim TargetReport As defRun_Report_Definition = Items.Reports_Definitions.Item_By_Name("LOCALHTMLADD_kWItems").ClassObject
+            Dim PaymentAccountReport = SettingsManagement.GetRunReport(TargetReport, Me)
+            Dim btnProductAllocation = kWHTMLElementRunReport.Create(Me, PaymentAccountReport, "Add New Company",
+              kWHTMLElementButton.buttonStyles.default,
+              kWHTMLElementRunReport.RunReportHow.RunNewWindow,
+              kWHTMLElementRunReport.RunReportButtons.None)
+            btnProductAllocation.ClassName = "btn btn-primary"
+            DivReportItem.Controls.Add(btnProductAllocation)
+            Return DivReportItem
+        End Function
+        Public Function AddCompanydetails(ReferenceID As String) As kWControlEventReturnInfo
+            Dim Items = New kWatchServer.kWItems
+            Dim SetUp = New kWatchServer.comCompanySetup
+            SetUp.Company_IDs = "0"
+            Items.Initialize(Me.User, CObj(SetUp))
+            Dim ReferanceItem = Me.User.Get_Item_Object(CStr(ReferenceID), True).ClassObject
+            Dim Brow = New kWGlobalFunctions.kWBrowser
+            Brow.Item = Report
+            'This gets us the text we are after to run the report
+            With Items.Reports_Definitions.Item_By_Name("LOCALHTMLADD_kWItems").ClassObject
+                With .CodeObject
+                    .SetDefaults
+                End With
+                Brow.HTMLText = .EvaluateAsText(False)
+            End With
+            Dim Doc = Brow.ShowModal(-1, "New Company", True, 0, 0) '8000, 9000)
+            Return New kWControlEventReturnInfo With {.success = True, .returnData = Doc.parentWindow.NewCompanyID}
+        End Function
+        Public Function FilterSection(LongID As String, OfficeID As Integer) As HTMLElementDIV
+            Dim DivFilterSection As New HTMLElementDIV()
+            Dim DivGetPaymentAccount = New HTMLElementDIV(GetPaymentAccounts(LongID, OfficeID))
+            DivFilterSection.Controls.Add(DivGetPaymentAccount)
+            Return DivFilterSection
+        End Function
+
+        Public Function GetBusinessUnitSelection() As kWHTMLElementInputSelect(Of WEBHTMLADD_kWItems, Integer)
+            Dim Items = New kWatchServer.kWItems
+            Dim SetUp = New kWatchServer.ofcOfficeSetUp
+            Items.Initialize(Me.User, CObj(SetUp))
+            Dim OfficeList = kWHTMLElementInputSelect.CreateDirect(Me, 0, "OfficeList", (From i As kWItem In Items Select i).ToList)
+            OfficeList.Value = Me.User.UserOffice.ID
+            OfficeList.LabelString = "Business Unit"
+            OfficeList.NothingInclude = False
+            OfficeList.onAfterUpdateEvent.onAfterTriggerFunctionName = "toggleCodeSelection"
+            Return OfficeList
+        End Function
+        Public Function GetFilterSection(LongID As String, OfficeID As String) As kWControlEventReturnInfo
+            Try
+                Return New kWControlEventReturnInfo With {.success = True, .returnData = FilterSection(LongID, OfficeID).ToString}
+            Catch ex As Exception
+                Return New kWControlEventReturnInfo With {.success = True, .returnData = ex.Message}
+            End Try
+        End Function
+        Public Function GetCategoriesHtml(MastCatID As String) As kWControlEventReturnInfo
+            Try
+                Return New kWControlEventReturnInfo With {.success = True, .returnData = GetCategories(MastCatID).ToString}
+            Catch ex As Exception
+                Return New kWControlEventReturnInfo With {.success = True, .returnData = ex.Message}
+            End Try
+        End Function
+        Public Function AddInvoice(info As kWControlEventInfo) As kWControlEventReturnInfo
+            Dim OfficeID1 As Integer = info.userObject.OfficeID
+            Dim Amount As Double = info.userObject.Amount
+            Dim IssuedTo As String = info.userObject.IssuedTo
+            Dim InvoiceFromID As String = info.userObject.InvoiceFromID
+            Dim GSTCode As String = info.userObject.GSTCode
+            Dim DateDue As Date = info.userObject.DateDue
+            Dim PaymentAccountID As Integer = info.userObject.PaymentAccountID
+            Dim IssueDate As String = info.userObject.IssueDate
+            Dim CategoryID As Integer = info.userObject.CategoryID
+            Dim InvoiceDetails As String = info.userObject.InvoiceDetails
+            Dim MasterCategoryID As Integer = info.userObject.MasterCategoryID
+
+            Dim errMsg As StringBuilder = ValidationSummary(MasterCategoryID, CategoryID, InvoiceDetails, Amount, PaymentAccountID)
+            If Not String.IsNullOrEmpty(errMsg.ToString) Then
+                Return New kWControlEventReturnInfo With {.success = False, .returnMessage = errMsg.ToString}
+            End If
+            Try
+                Dim Invoiceadd As invInvoiceSetUp = Me.User.Banks(CStr(utlClassType.utlClassTypeinvInvoice_Bank)).SetUpObject
+                Dim NewInvoice = Invoiceadd.Add(Amount, IssuedTo, InvoiceFromID, PaymentAccountID, GSTCode, DateDue, IssueDate, CategoryID, OfficeID1)
+                NewInvoice.GST_Rate = User.Options.Item_By_Name("invGSTDefaultRate").ClassObject.value
+                NewInvoice.Invoice_For = InvoiceDetails
+                NewInvoice.Created_Date = Date.Now.ToString
+                NewInvoice.Created_By_Contact_ID = Me.User.Contact.ID
+                NewInvoice.Invoice_Items.Add(NewInvoice.Amount, NewInvoice.ID, NewInvoice.Invoice_For, NewInvoice.Category_ID, NewInvoice.GST_Code, NewInvoice.Created_Date, NewInvoice.OfficeID)
+                Dim ReportInfo As Object = New Dynamic.ExpandoObject
+                Dim abc = "LOCALHTML_" & TypeName(NewInvoice)
+                ReportInfo.targetReportGuid = CType(NewInvoice.Reports_Definitions.Item_By_Name("LOCALHTML_" & TypeName(NewInvoice)).ClassObject, defRun_Report_Definition).RunReportGUID ' "43567d47-b760-4c5a-b527-b9b702540a19"
+                ReportInfo.targetReportPropertiesGuid = Nothing '"{}"
+                Return New kWControlEventReturnInfo With {.success = True, .returnData = ReportInfo, .returnMessage = "Invoice Has Been Added Successfully"}
+            Catch ex As Exception
+                Return New kWControlEventReturnInfo With {.success = False, .returnMessage = ex.Message}
+            End Try
+        End Function
+#End Region
+#Region "All Lists"
+        Public Function InvoiceFrom() As List(Of kWHTMLElementInputSelect.SelectOption)
+            Dim options As New List(Of kWHTMLElementInputSelect.SelectOption)
+            options.Add(New kWHTMLElementInputSelect.SelectOption With {.id = "Default", .text = "Default"})
+            options.Add(New kWHTMLElementInputSelect.SelectOption With {.id = "Specify", .text = "Specify"})
+            Return options
+        End Function
+        Public Function AddPaymentAccount(ReferenceID As String) As kWControlEventReturnInfo
+            Dim ReferanceItem = Me.User.Get_Item_Object(CStr(ReferenceID), True).ClassObject
+            If ReferanceItem.ClassType = 6 Then
+                ReferanceItem = ReferanceItem.Company
+            End If
+            Dim Brow = New kWGlobalFunctions.kWBrowser
+            Brow.Item = Report
+            'This gets us the text we are after to run the report
+            Dim PaymentAccountsReferance = CType(ReferanceItem, comCompany).Payment_AccountsInvoices
+            With PaymentAccountsReferance.Reports_Definitions.Item_By_Name("LOCALHTMLADD_kWItems").ClassObject
+                With .CodeObject
+                    .SetDefaults
+                    .CSSInclude = True
+                    .IncludeHeading = True
+                    .DefaultName = "Invoice Account"
+                    .DefaultItemReferance_ID = ReferanceItem.LongID
+                    .DefaultPayment_Account_Type = 2
+                    .ShowPayment_Account_Type = False
+                    .ShowItemReferance_ID = False
+                    .DefaultOpenItem = False
+                    .ItemReferance = ItemReferance & ".Reports_Definitions.Item_By_Name(~!~LOCALHTMLADD_kWItems~!~).classObject.codeObject.PaymentAccountsReferance"
+                End With
+                Brow.HTMLText = .EvaluateAsText(False)
+            End With
+            Dim Doc = Brow.ShowModal(-1, "New Payment Account", True, 0, 0) '= 9000, 12000)
+            Return New kWControlEventReturnInfo With {.success = True, .returnData = Doc.parentWindow.NewPaymentAccountID}
+        End Function
+        Public Function GetPaymentAccounts(LongID As String, OfficeID As Integer) As HTMLBase
+            Dim InvoiceFrom As comCompany = User.Get_Item_Object(LongID).ClassObject
+            Dim DivPaymentAccount As New HTMLElementDIV
+            Dim ComID = 1
+            If OfficeID > 0 Then
+                ComID = OfficeID
+            End If
+            Dim Paymentaccount As New List(Of kWHTMLElementInputSelect.SelectOption)
+            Paymentaccount.Add(New kWHTMLElementInputSelect.SelectOption With {.id = 0, .text = "Select Payment Account"})
+            If (InvoiceFrom IsNot Nothing) Then
+                Dim paymentaccountlist1 = (From PaymentaccntObjct As pymPayment_Account In InvoiceFrom.Payment_AccountsInvoices Where PaymentaccntObjct.OfficeID = ComID Select New kWHTMLElementInputSelect.SelectOption With {.id = PaymentaccntObjct.ID, .text = PaymentaccntObjct.Name}).ToList
+                Paymentaccount.AddRange(paymentaccountlist1)
+            End If
+            Dim PaymentAccountID = kWHTMLElementInputSelect.CreateDirect(Me, 0, "PaymentAccountID", Paymentaccount)
+            PaymentAccountID.LabelString = "Payment Account"
+            PaymentAccountID.LabelDisplay = False
+            PaymentAccountID.FontSize = FontSize.medium
+            PaymentAccountID.NothingInclude = False
+            Dim AddpaymentAcnt = kWHTMLElementButton.Create(Me, "Add new payment account")
+            AddpaymentAcnt.ID = "addnewcompany"
+            AddpaymentAcnt.ClassName = "btn btn-primary btn-md"
+            AddpaymentAcnt.onClickEvent.onAfterTriggerFunctionName = "AddPaymentAccount"
+            DivPaymentAccount.Controls.Add(PaymentAccountID)
+            DivPaymentAccount.Controls.Add(AddpaymentAcnt)
+            Return DivPaymentAccount
+        End Function
+        Public Function GetInvoiceMasterCategories(OfficeID) As kWHTMLElementInputSelect(Of WEBHTMLADD_kWItems, Integer)
+            Dim SelLst = ""
+            Dim DefaultOffice = Nothing
+            If OfficeID = 0 Then
+                DefaultOffice = 1
+            Else
+                DefaultOffice = OfficeID
+            End If
+            Dim Items = New kWatchServer.kWItems
+            Dim SetUp = New kWatchServer.invMaster_CategorySetUp
+            SetUp.OfficeIDs = DefaultOffice
+            Items.Initialize(Me.User, CObj(SetUp))
+            Items.SortedProperty = "Name"
+            Items.Sorted = True
+            Items.Sorted = False
+            Dim MasterCategoryIDS = kWHTMLElementInputSelect.CreateDirect(Me, 0, "MasterCategoryIDS", (From i As kWItem In Items Select i).ToList)
+            MasterCategoryIDS.NothingInclude = True
+            MasterCategoryIDS.NothingText = "Select Invoice Category"
+            MasterCategoryIDS.NothingValue = 0
+            MasterCategoryIDS.LabelDisplay = False
+            MasterCategoryIDS.NothingInclude = True
+            MasterCategoryIDS.ValueAddIfNotInOptions = True
+            MasterCategoryIDS.SortOptions = True
+            MasterCategoryIDS.onAfterUpdateEvent.onAfterTriggerFunctionName = "GetMasterCategories"
+            Return MasterCategoryIDS
+        End Function
+        Public Function GetCategories(MastCatID As Integer) As kWHTMLElementInputSelect(Of WEBHTMLADD_kWItems, Integer)
+            Dim MasterCatagory As invMaster_Category
+            If MastCatID > 0 Then
+                MasterCatagory = Me.User.Get_Item_Object(utlClassType.utlClassTypeinvMaster_Category & "~" & MastCatID, True).ClassObject
+                MasterCatagory.Category_Descriptions.SortedProperty = "Name"
+                MasterCatagory.Category_Descriptions.Sorted = True
+                MasterCatagory.Category_Descriptions.Sorted = False
+                Dim CategoryID = kWHTMLElementInputSelect.CreateDirect(Me, 0, "CategoryID", (From i As kWItem In MasterCatagory.Categories Select i).ToList)
+                CategoryID.NothingText = "Select Sub Invoice Category"
+                CategoryID.NothingValue = 0
+                CategoryID.LabelDisplay = False
+                CategoryID.NothingInclude = True
+                CategoryID.ValueAddIfNotInOptions = True
+                CategoryID.SortOptions = True
+                Return CategoryID
+            Else
+                Return Nothing
+            End If
+        End Function
+
+#End Region
+#Region "Validation Summary"
+        Public Function ValidationSummary(MasterCategoryID As Integer, CategoryID As Integer, InvoiceDetails As String, Amount As Double, PaymentAccountID As Integer) As StringBuilder
+            Dim errMsg As New StringBuilder
+            If MasterCategoryID = 0 Then
+                errMsg.AppendLine("Please Select Master Invoice Category</br>")
+            End If
+            If CategoryID = 0 Then
+                errMsg.AppendLine("Please Select Category For Invoice </br>")
+            End If
+            If InvoiceDetails.Length = 0 Then
+                errMsg.AppendLine("Please Enter Brief Description Of Invoice Details</br>")
+            End If
+            Dim AmountResult As Boolean = ValidateSpecialCharacters(Amount)
+            If AmountResult = True Then
+                errMsg.AppendLine("Special Characters Not Allowed In Amount</br>")
+            End If
+            If Amount < 0 Then
+                errMsg.AppendLine("Invoice Amount Cannot Be Less Than Zero</br>")
+            End If
+            If PaymentAccountID = 0 Then
+                errMsg.AppendLine("Please Select Account.")
+            End If
+            Return errMsg
+        End Function
+        Function ValidateSpecialCharacters(stringname As String) As Boolean
+            Dim result As Boolean = False
+            result = stringname.IndexOfAny("[~`!@#$%^&*()-+=|{}':;,<>/?]".ToCharArray) <> -1
+            Return result
+        End Function
+#End Region
+#Region "Default Code"
+        Public Function DropdownInvoiceCategory(OfficeID As String) As HTMLElementDIV
+            Dim Invoicecategory As New HTMLElementDIV
+            Dim DivInvoicemasterCategories = New HTMLElementDIV(GetInvoiceMasterCategories(OfficeID))
+            Invoicecategory.Controls.Add(DivInvoicemasterCategories)
+            Return Invoicecategory
+        End Function
+        Public Function GetInvoiceMasterCategoriesNew(OfficeID) As kWHTMLElementInputSelect(Of WEBHTMLADD_kWItems, Integer)
+            Dim SelLst = ""
+            Dim DefaultOffice = Nothing
+            If OfficeID = 0 Then
+                DefaultOffice = 1
+            Else
+                DefaultOffice = OfficeID
+            End If
+            Dim Items = New kWatchServer.kWItems
+            Dim SetUp = New kWatchServer.invMaster_CategorySetUp
+            SetUp.OfficeIDs = DefaultOffice
+            Items.Initialize(Me.User, CObj(SetUp))
+            Items.SortedProperty = "Name"
+            Items.Sorted = True
+            Items.Sorted = False
+            Dim MasterCateg = kWHTMLElementInputSelect.CreateDirect(Me, 0, "MasterCateg", (From i As kWItem In Items Select i).ToList)
+            MasterCateg.NothingInclude = True
+            MasterCateg.NothingText = "Select Invoice Category"
+            MasterCateg.NothingValue = 0
+            MasterCateg.LabelDisplay = False
+            MasterCateg.NothingInclude = True
+            MasterCateg.ValueAddIfNotInOptions = True
+            MasterCateg.SortOptions = True
+            MasterCateg.onAfterUpdateEvent.onAfterTriggerFunctionName = "GetMasterCategories"
+            Return MasterCateg
+        End Function
+        Public Function SubCategoriesdiv(MastCatID As Integer) As HTMLElementDIV
+            Dim CategoriesBox As New HTMLElementDIV()
+
+            If MastCatID > 0 Then
+                Dim divInvoiceFromValue = New HTMLElementDIV(GetCategories(MastCatID))
+                CategoriesBox.Controls.Add(divInvoiceFromValue)
+            End If
+            Return CategoriesBox
+        End Function
+        Public Function GetMasterCategories(OfficeID)
+            Dim MasCat
+            Dim Cat
+            Dim SelLst
+
+            Dim Items = CreateObject("kWatchServer.kWItems")
+            Dim SetUp = New kWatchServer.expMaster_CategorySetUp
+
+            If Me.User.VersionCompatible(9, 0, 99) Then
+                SetUp.OfficeIDs = OfficeID
+            End If
+
+            Items.Initialize(Me.User, CObj(SetUp))
+            SelLst = ""
+
+            For Each MasCat In Items
+                SelLst = SelLst & "src=../iconsbmp/" & MasCat.Icon & ".bmp" & MasCat.ID & MasCat.Name
+            Next
+            Return SelLst
+        End Function
+        Public Function OfficeIDUpdated(officeid)
+
+            'MasterCatagories.InnerHTML = CodeObject.CallCodeObject("GetInvoiceMasterCategories", officeid)
+            'IssuedToUpdated()
+
+        End Function
+
+        Public Function IssuedToUpdated()
+
+            '            PaymentAccounts.InnerHTML = CodeObject.CallCodeObject("GetPaymentAccounts", Array(IssuedTo.Value, OfficeID.Value))
+            '            InvoiceFromID.Value = IssuedTo.Value
+
+            '            If Len(IssuedTo.Value) > 0 Then
+            '                PaymentAcountSelected PaymentAccountID.Value
+            'Else
+            '                PaymentAcountSelected 0
+            'End If
+
+        End Function
+        Public Function PaymentAcountSelected(PymID)
+            'This will go through and load up the Payment Account Specific Information
+            Dim Cat
+
+            If Len(PymID) = 0 Then PymID = 0
+
+            'This will be as follows
+            If PymID = 0 Then
+                Return invGSTCodeSupplies.G6TaxableSupplies ' Original GST_Code.Value =
+            Else
+                Return CodeObject.GetProperty("User.Get_Item_Object(""142~" & PymID & """, True).ClassObject.GST_Code", String.Empty) ' GST_Code.Value =
+
+            End If
+        End Function
+
+        Public Function IsReady()
+            Dim problem
+
+            'If OfficeID.Value = 0 Then
+            '    problem = problem & "Please specify the business unit to add the expense to" & vbCrLf
+            'End If
+
+            'If Len(IssuedTo.Value) = 0 Then
+            '    problem = problem & "Please select who the invoice si to be issued to" & vbCrLf
+            'Else
+            '    If PaymentAccountID.Value = 0 Then
+            '        problem = problem & "Please select a Payment Account" & vbCrLf
+            '    End If
+            'End If
+
+            'If InvoiceFromAsPaidTo.Checked = False Then
+            '    If Len(InvoiceFromID.Value) = 0 Then
+            '        problem = problem & "Please select Invoice is From" & vbCrLf
+            '    End If
+            'End If
+
+            'If MasterCategoryID.Value > 0 Then
+            '    If CategoryID.Value = 0 Then
+            '        problem = problem & "Please select a Category for the invoice" & vbCrLf
+            '    End If
+            'Else
+            '    problem = problem & "Please select Master Catagory and Catagory for the invoice" & vbCrLf
+            'End If
+
+            'If Len(InvoiceDetails.Value) = 0 Then
+            '    problem = problem & "Please include a brief description for the invoice" & vbCrLf
+            'End If
+
+            'If GST_Code.Value = 0 Then
+            '    problem = problem & "Please select a valid GST code" & vbCrLf
+            'End If
+
+
+            'If CDate(DateDue.Value) <CDate(IssueDate.Value) Then
+            '    problem = problem & "Date Due must be greater than Issue Date" & vbCrLf
+            'End If
+
+            'IsReady = problem
+            ''PaidTo
+            ''ExpenseFromID
+            ''ExpenseAmount
+            ''PaymentAccountID
+            ''MasterCategoryID
+            ''	CategoryID
+            ''ExpenseDetails 
+            ''DatePurchased 
+            ''DateDue
+            ''AccountNumber
+            ''InvoiceNumber
+            ''I'sPaid
+            ''DatePaid 
+            ''PaidFromAccount
+            ''PaymentMethod
+            ''PaymentRefNumber
+        End Function
+
+        Public Sub BrowserControl_onLoad()
+
+            'On Error Resume Next
+            'Window.SetTimeout "BrowserControl.SizeToFit", 1000, "VbScript"
+
+            'BrowserControl.SizeToFit
+
+            'Exit Sub
+            'If LCase(TypeName(BrowserControl)) = LCase("kWHTML_Add") Then
+            '    If Not BrowserControl.List_Items Is Nothing Then
+            '        BrowserControl.Interface.WindowUpper.Explorer.RightPaneTopHeight = Document.Body.ScrollHeight + 10
+            '    Else
+            '        BrowserControl.Height = BrowserControl.ScaleX(Document.Body.ScrollHeight + 10, 3, 1) + (BrowserControl.Height - BrowserControl.ScaleHeight)  'Twips = 567 to 1cm
+            '        BrowserControl.Width = BrowserControl.ScaleX(750 + 10, 3, 1)
+            '    End If
+            'ElseIf LCase(TypeName(BrowserControl)) = LCase("kwBrowser") Then
+            '    'This means that we are global
+            '    BrowserControl.Height = BrowserControl.RefFORM.ScaleX(Document.Body.ScrollHeight + 10, 3, 1) + (BrowserControl.Height - BrowserControl.RefFORM.ScaleHeight)  'Twips = 567 to 1cm
+            '    BrowserControl.Width = 40000 'BrowserControl.RefFORM.ScaleX(10000 + 10 ,3, 1)
+            'End If
+
+        End Sub
+
+        Public Function PaymentAccountsReferance()
+
+            'This will return a referance to an empty payment accounts object - this is referanced by this form to enable access to the payment accounts add form
+
+
+
+            Dim Items = New kWatchServer.kWItem
+            Dim SetUp = New kWatchServer.pymPayment_AccountSetUp
+
+            SetUp.Payment_Account_IDs = 0
+
+            Items.Initialize(Me.User, CObj(SetUp))
+
+            'Return the referance to nothing here
+            Return Items
+
+        End Function
+        '<ThreadStatic()>
+        Public Shared SharedMe As WEBHTMLADD_kWItems
+        'Dim DefaultIssueToID = String.Empty
+        'Dim DefaultIssueToPaymentAccountID = String.Empty
+        'Dim DefaultOpenItem = True
+        'Dim ItemReferance1 = "User.Get_Item_Object(~!~" & Report.LongID & "~!~, True).ClassObject.Object"
+        ' Dim OfficeID1 = String.Empty
+
+
+        'Private _Entities As Entities
+        '''' <summary>
+        '''' This should only be used when updating properties, not in any other code - when you need the entities you should
+        '''' create it yourself
+        '''' </summary>
+        '''' <value></value>
+        '''' <returns></returns>
+        '''' <remarks></remarks>
+        'Public ReadOnly Property Entities As Entities
+        '    Get
+        '        If Not _Entities Is Nothing Then
+        '            If _Entities.IsDisposed Then
+        '                _Entities = Nothing
+        '            End If
+        '        End If
+        '        If _Entities Is Nothing Then
+        '            _Entities = New Entities(Me.User)
+        '        End If
+
+        '        Return _Entities
+        '    End Get
+        'End Property
+
+        ''' <summary>
+        ''' This can be used to associate an icon with this report that is different to the underlying report
+        ''' You could set this within the SetDefaults, or you could create a get and set componet of the 
+        ''' property and override it
+        ''' </summary>
+        ''' <returns></returns>
+
+        Public Property ReportIcon As Icons Implements WebForm.ReportIcon
+
+        ''' <summary>
+        ''' Initialization code in here for this report.  This code will be called each time the report is ran
+        ''' other call reports should also call this before using the report output or any contained functions
+        ''' </summary>
+        ''' <remarks></remarks>
+        Public Sub SetDefaults() Implements defReport_Definitions.defReportDefinitionBase.SetDefaults
+
+            DefaultIssueToID = String.Empty
+            DefaultIssueToPaymentAccountID = String.Empty
+            DefaultOpenItem = True
+            ItemReferance = "User.Get_Item_Object(~!~" & Report.LongID & "~!~, True).ClassObject.Object"
+            prvOfficeID = String.Empty
+
+            'Uncomment these lines if you have an entitites object
+            'If Not _Entities Is Nothing Then
+            '    _Entities.Dispose()
+            '    _Entities = Nothing
+            'End If
+
+
+        End Sub
+        Public Function IssueToPaymentAccountID() As Long
+
+            If String.IsNullOrEmpty(DefaultIssueToPaymentAccountID) Then
+                If Len(Me.SetUpObject.ClassObject.Issued_To_Account_IDs) > 0 And InStr(Me.SetUpObject.ClassObject.Issued_To_Account_IDs, ",") = 0 Then
+                    IssueToPaymentAccountID = CLng(Me.SetUpObject.ClassObject.Issued_To_Account_IDs)
+                Else
+                    Return 0
+                End If
+            Else
+                Return CLng(DefaultIssueToPaymentAccountID)
+            End If
+
+        End Function
+        'Dim IssueToPaymentAccount
+
+        Public Function IssueTo()
+            Dim IsTo
+
+            IsTo = IssueToID()
+
+            If Len(IsTo) > 0 Then
+                Return Me.User.Get_Item_Object(IsTo, True).ClassObject
+            Else
+                Return Nothing
+            End If
+
+        End Function
+
+
+        Public Function PaidFromBankAccounts(OfficeID)
+
+
+            Dim MasCat
+            Dim Cat
+            Dim SelLst
+
+            Dim Items = New kWatchServer.kWItems
+            Dim SetUp = New kWatchServer.pymPayment_AccountSetUp
+
+            SetUp.OfficeIDs = OfficeID
+            SetUp.IsBankAccount = True
+            Items.Initialize(Me.User, CObj(SetUp))
+
+            SelLst = ""
+
+            With Me.User.Reports_Definitions.Item_By_Name("HTML_Select").ClassObject
+                With .CodeObject
+                    .SetDefaults
+                    .ID = "PaidFromAccount"
+                    '.kWID = Me.LongID
+                    '.DataField = "InvoiceType"
+                    .Width = "250px"
+                    '.List = "0,Hourly Rates|1,Specified Amount|2,Expenses"
+                    .Items = Items
+                    .Editable = True
+                    .ShowEditButton = False
+                End With
+                SelLst = .EvaluateAsText(False)
+            End With
+
+            Return SelLst
+
+        End Function
+
+        Public Function GetOfficeID(IssueToPaymentAccount As String)
+
+
+            Dim It
+
+            If String.IsNullOrEmpty(prvOfficeID) Then
+                If Me.User.VersionCompatible(9, 0, 99) Then
+                    prvOfficeID = 0
+
+                    If IssueToPaymentAccount Is Nothing Then
+                        If Len(Me.SetUpObject.ClassObject.OfficeIDs) > 0 And InStr(Me.SetUpObject.ClassObject.OfficeIDs, ",") = 0 Then
+                            prvOfficeID = Me.SetUpObject.ClassObject.OfficeIDs
+                        Else
+                            Dim SetUp = New kWatchServer.ofcOfficeSetUp
+                            Dim Items = New kWatchServer.kWItems
+                            Items.Initialize(Me.User, CObj(SetUp))
+
+                            For Each It In Items
+                                It = It.ClassObject
+                                If It.CompanyID = Me.User.Company.ID Then
+                                    prvOfficeID = It.ID
+                                    Exit For
+                                End If
+                            Next
+                        End If
+                    Else
+                        'prvOfficeID = IssueToPaymentAccount.OfficeID '***** I Commented it 
+                    End If
+                Else
+                    prvOfficeID = 1
+                End If
+            End If
+
+            Return prvOfficeID
+
+        End Function
+        Public Function IssueToPaymentAccount()
+            Dim IsTo
+
+            IsTo = IssueToPaymentAccountID()
+
+            If IsTo > 0 Then
+                Return Me.User.Get_Item_Object(utlClassType.utlClassTypepymPayment_Account & "~" & IsTo, True).ClassObject
+            Else
+                Return Nothing
+            End If
+
+        End Function
+        Public Function IssueToID()
+            Dim IssueToPaymentAccount = ""
+            If String.IsNullOrEmpty(DefaultIssueToID) Then
+                If IssueToPaymentAccount Is Nothing Then
+                    If Len(Me.SetUpObject.ClassObject.Issued_To_IDs) > 0 And InStr(Me.SetUpObject.ClassObject.Issued_To_IDs, ",") = 0 Then
+                        IssueToID = Me.SetUpObject.ClassObject.Issued_To_IDs
+                    Else
+
+                    End If
+                Else
+                    ' IssueToID = IssueToPaymentAccount.ItemReferance_ID ' commented 
+                End If
+            Else
+                IssueToID = DefaultIssueToID
+            End If
+            Return IssueToID
+        End Function
+        Public Function GetAddProcedure()
+
+            'Use this procedure to get the add command procedure that is used to add items of this type to the SQL server
+            GetAddProcedure = Me.Bank.AddCommandProcedure
+            'CREATE Procedure #expAdd_Expense  
+            '(@Amount Money, @Pay_To_ID VarChar(50), @Expense_From_ID VarChar(50), @Pay_To_Account_ID int, @Expense_Category_ID int,  @GST_Code int,  @Date_Due DateTime, @Date_Purchased DateTime, @Created_Date DateTime, @Created_By_Contact_ID int, @OfficeID Int) 
+            'As  SET nocount ON  INSERT INTO  
+            'expExpenses(Amount, Pay_To_ID, Expense_From_ID, Pay_To_Account_ID, Expense_Category_ID, GST_Code, Created_Date, Created_By_Contact_ID, Date_Due, Date_Purchased, OfficeID )  
+            'VALUES (@Amount, @Pay_To_ID, @Expense_From_ID, @Pay_To_Account_ID, @Expense_Category_ID, @GST_Code, @Created_Date, @Created_By_Contact_ID, @Date_Due, @Date_Purchased, @OfficeID)  SELECT @@IDENTITY ID  Return 
+        End Function
+        ''' <summary>
+        ''' This is a callback that is called after the report if produced.  The report is a document of type Word, Excel, Email or RTF
+        ''' This depends on the type of report produced
+        ''' </summary>
+        ''' <param name="ReportObj">The Report object</param>
+        ''' <remarks></remarks>
+        Public Sub AfterReportProduce(ByVal ReportObj As Object) Implements defReport_Definitions.defReportDefinitionBase.AfterReportProduce
+        End Sub
+
+        ''' <summary>
+        ''' The callback is called after the file has been saved to kWatch.  The file object is a referances to the filFile object that has 
+        ''' just been saved
+        ''' </summary>
+        ''' <param name="File">The newly saved file</param>
+        ''' <remarks></remarks>
+        Public Sub AfterFileSave(ByVal File As kWatchServer.filFile) Implements defReport_Definitions.defReportDefinitionBase.AfterFileSave
+        End Sub
+
+
+        ''' <summary>
+        ''' This is the web request object that has been passed back from the originating call. This contains
+        ''' information relating to the browser, the call been made and the IIS server that the call came from.
+        ''' This is a copy of the request object that is generated by the server 
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Property Request As UserRequest Implements WebForm.Request
+
+        ''' <summary>
+        ''' This is the WebSite that this request belongs to
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Property Web As webWebSite Implements WebForm.Web
+
+        ''' <summary>
+        ''' This is the webContact that relatest to this request
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Property WebContact As webContactLogin Implements WebForm.WebContact
+
+#Region "Settings"
+
+        ''' <summary>
+        ''' This will return the settings object as a dynamic expando object that you can review and edit.  If you
+        ''' want your settings object casted to a specific type, use the GetSettings function.  Setting an object
+        ''' to this location will also update the settings object for you as well
+        ''' 
+        ''' This will get the settings object for this report object.  Settings objects are unique based on
+        ''' the RunReportID, LoggedInContact (either web or local), The active WebID or web site, a DashboardwidgetID and
+        ''' optionaly a SettingsLocationID that you might choose to use.
+        ''' 
+        ''' So for a kWatch report delivered within kWatch - this would be unique based on RunReportID and contactID only as
+        ''' webID, DashboardwidgetID and SettinglocationID are all nothing
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Property Settings As Object Implements WebForm.Settings
+            Get
+                Return WebManagement.SettingsManagement.GetSettings(Me) ' Newtonsoft.Json.JsonConvert.DeserializeObject(Of ExpandoObject)(Me.SettingsRecord.SettingsObject)
+            End Get
+            Set(value As Object)
+                WebManagement.SettingsManagement.SaveSettings(value, Me)
+            End Set
+        End Property
+
+        ''' <summary>
+        ''' This will return the settings object as a dynamic expando object that you can review and edit.  If you
+        ''' want your settings object casted to a specific type, use the GetSettings function.  Setting an object
+        ''' to this location will also update the settings object for you as well
+        ''' 
+        ''' This will get the settings object for this report object.  Settings objects are unique based on
+        ''' the RunReportID, LoggedInContact (either web or local), The active WebID or web site, a DashboardwidgetID and
+        ''' optionaly a SettingsLocationID that you might choose to use.
+        ''' 
+        ''' So for a kWatch report delivered within kWatch - this would be unique based on RunReportID and contactID only as
+        ''' webID, DashboardwidgetID and SettinglocationID are all nothing
+        ''' </summary>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Function GetSettings(Of SettingObjectType)() As SettingObjectType Implements WebForm.GetSettings
+
+            Return WebManagement.SettingsManagement.GetSettings(Of SettingObjectType)(Me)
+
+        End Function
+
+        ''' <summary>
+        ''' This will save the settings object to the database
+        ''' </summary>
+        ''' <typeparam name="SettingObjectType"></typeparam>
+        ''' <param name="Obj"></param>
+        ''' <remarks></remarks>
+        Public Sub SaveSettings(Of SettingObjectType)(Obj As SettingObjectType) Implements WebForm.SaveSettings
+
+            WebManagement.SettingsManagement.SaveSettings(Obj, Me)
+
+        End Sub
+
+        ''' <summary>
+        ''' This is a global property that if set - will be used as a reportProperties object by the dash-board component
+        ''' You do not need to set this - and it is set if this report is used as 
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        <kWHTML.kWForms.reportProperty>
+        Public Property DashboardWidgetID As Integer? Implements WebForm.DashboardWidgetID
+        ''' <summary>
+        ''' This will get the settings record for this report object.  Settings objects are created and unique based on
+        ''' the RunReportID, LoggedInContact (either web or local), The active WebID or web site, a dash-board Widget ID and
+        ''' optionaly a SettingsLocationID that you might choose to use.
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public ReadOnly Property SettingsRecord As defReportSetting Implements WebForm.SettingsRecord
+            Get
+                Return WebManagement.SettingsManagement.GetSettingsRecord(Me)
+            End Get
+        End Property
+
+
+        ''' <summary>
+        ''' This will return the guid that is used within the report object
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public ReadOnly Property ReportPropertiesGuid As Guid Implements WebForm.ReportPropertiesGuid
+            Get
+                Return WebManagement.SettingsManagement.getReportPropertiesGuid(Me)
+            End Get
+        End Property
+
+        ''' <summary>
+        ''' This wil return the report properties object for this report
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public ReadOnly Property ReportProperties As Object Implements WebForm.ReportProperties
+            Get
+                Return WebManagement.SettingsManagement.GetReportProperties(Me)
+            End Get
+        End Property
+#End Region
+
+
+
+
+#End Region
+    End Class
+End Namespace

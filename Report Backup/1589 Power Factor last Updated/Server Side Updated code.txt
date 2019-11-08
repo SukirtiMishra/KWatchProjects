@@ -1,0 +1,613 @@
+Imports kWGlobalFunctions.kWGlobalsShared
+Imports kWHTML.Elements
+Imports WebManagement
+Imports kWHTML.kWForms
+Imports kWHTML.kWChart
+Imports kWHTML.kWChart.ChartOptions
+
+
+Namespace kWatchServer.repReports
+    ''' <summary>"
+    ''' Define all custom code for this assembly within this class 
+    ''' </summary>
+    ''' <remarks></remarks>
+    Public Class WEB_SitePowerFactorReport
+        Implements WebForm
+
+#Region "Variables & Properties"
+
+        Private prvHighestDemandDate As Date
+        Private prvHighestDemand As Decimal
+        Private prvkWAtMaxkVA As Decimal
+        Private prvkVArAtMaxkVA As Decimal
+        Private prvPowerFactorAtMaxkVA As Decimal
+
+        ReadOnly Property OptionsPowerFactor As ChartOptions
+            Get
+                Dim chartSettings = Nothing
+                Try
+                    chartSettings = Me.GetSettings(Of ChartOptions)
+                Catch ex As Exception
+                End Try
+                Dim PrevMonth = Now.AddMonths(-1)
+
+                Dim stream1 = (From ds As datDataStream In Me.Site.DataStreams Where ds.DataStreamTypeID = 15 Select ds.LongID).FirstOrDefault
+                Dim stream2 = (From ds As datDataStream In Me.Site.DataStreams Where ds.DataStreamTypeID = 5 Select ds.LongID).FirstOrDefault
+                Dim stream3 = (From ds As datDataStream In Me.Site.DataStreams Where ds.DataStreamTypeID = 1 Select ds.LongID).FirstOrDefault
+                Dim stream4 = (From ds As datDataStream In Me.Site.DataStreams Where ds.DataStreamTypeID = 16 Select ds.LongID).FirstOrDefault
+
+                Dim chartSettingss = New ChartOptions
+                chartSettingss.itemReference = Me.Site.LongID
+                Dim StartDateCalc = CDate(Format(HighestDemandDate, "dd-MMM-yyyy"))
+                Dim EndDateCalc = CDate(Format(HighestDemandDate, "dd-MMM-yyyy") & " 23:59:59")
+                chartSettingss.startDateSettings.specifiedDate = StartDateCalc
+                chartSettingss.startDateSettings.dateType = dateType.specified
+                chartSettingss.endDateSettings.specifiedDate = EndDateCalc
+                chartSettingss.endDateSettings.dateType = dateType.specified
+                chartSettingss.interval = Me.DefaultVA_DataStream.Interval
+                chartSettingss.stacked = False
+                chartSettingss.title.text = "" & Me.Name
+
+                Dim Yaxis = New optyAxis
+                Yaxis.id = "metUnitRatio"
+                Yaxis.title.text = "Power Factor"
+                Yaxis.showLastLabel = True
+                chartSettingss.yAxis.Add(Yaxis)
+
+                Dim xAxisChanged = New optxAxis
+                xAxisChanged.title = "xAxis"
+                Yaxis.showFirstLabel = True
+                chartSettingss.xAxis.Add(xAxisChanged)
+                Dim yAxisChanged = New optyAxis
+                chartSettingss.yAxis.Add(yAxisChanged)
+
+                Dim optsrz = New optSeries
+                optsrz.name = "OPTSeriez"
+                optsrz.typeEnum = kWHTML.kWChart.ChartOptions.optSeries.SeriesType.line
+
+
+                Dim source As optSeries = chartSettingss.AddSource(stream2)
+                optsrz.data = source
+                source.typeEnum = kWHTML.kWChart.ChartOptions.optSeries.SeriesType.column
+
+                ' Dim source As optSeries = 
+                chartSettingss.AddSource(stream1)
+                'optsrz.data = source
+
+                ' Dim source As optSeries = 
+                chartSettingss.AddSource(stream3)
+                ' optsrz.data = source
+
+                'Dim source As optSeries = 
+                chartSettingss.AddSource(stream4)
+                ' optsrz.data = source
+
+                Me.SaveSettings(chartSettingss)
+                Return chartSettingss
+            End Get
+        End Property
+
+        Public ReadOnly Property HighestDemandDate As Date
+            Get
+                Dim tmp
+                If prvHighestDemandDate = Date.MinValue Then
+                    tmp = HighestDemand()
+                End If
+                Return prvHighestDemandDate
+            End Get
+        End Property
+
+#End Region
+
+#Region " Form(Page) Load Methods"
+        ''' <summary>
+        ''' Main function that is returned to the lines of the report when it is ran
+        ''' </summary>
+        ''' <param name="html"></param>
+        ''' <remarks></remarks>
+        Public Sub GetReport(html As HTMLTextWriterkWatch) Implements WebForm.GetReport
+            Dim repBase = GetReportBase()
+            repBase.ToString(html)
+        End Sub
+
+        Public Function GetReportBase() As HTMLkWFormBase Implements WebForm.GetReportBase
+            'Create the form base object
+            Dim Form = HTMLkWFormBase.Create(Me)
+            Form.onLoadFormBase = "onLoadFormBase1589"  'make sure this matches the onLoadFormBase name
+            Form.JScript.Add(My.Resources.ClientScript)
+            Form.IncludeHeader = False
+
+            Dim MainHeading = New HTMLElementH3("Power Factor Analysis")
+            'Main Heading
+            Form.FormSectionMain.Add(MainHeading)
+            'Power Factor Heading
+            Form.FormSectionMain.Add(GetPowerFactorHeading)
+            'Power Factor Details
+            Form.FormSectionMain.Add(GetPFDetails)
+            'Power Factor Sub Heading
+            Form.FormSectionMain.Add(GetPFSubHeading)
+            'Kw Chart 
+            Dim chart = kWHTML.kWChart.kWChartInterval.Create(Me, "newChart", OptionsPowerFactor)
+            Form.FormSectionMain.Add(chart)
+
+            If PowerFactorAtMaxkVA() < 0.92 Then
+                Form.FormSectionMain.Add(GetBadPowerFacorHeading)
+                Form.FormSectionMain.Add(BadPowerFactorTableAsDiv)
+            Else
+                Form.FormSectionMain.Add(GetGoodPFHeading)
+            End If
+            Return Form
+        End Function
+
+        Public Function RefreshFormBase() As String Implements WebForm.RefreshFormBase
+            'Get the report
+            Dim repBase As HTMLkWFormBase(Of WEB_SitePowerFactorReport) = GetReportBase()
+            'This will exclude the jscript code and other items
+            repBase.RefreshPageCall = True
+            Dim html As New HTMLTextWriterkWatch
+            repBase.ToString(html)
+            Return html.ToString
+        End Function
+
+#End Region
+
+#Region " Text & Headings"
+
+        Private Function GetPowerFactorHeading() As HTMLElementDIV
+            Dim PowerFactorHeading = New HTMLElementDIV("The power factor is a measure Of the magnetic efficiency of your plant. A good power factor 
+                                                        will approach 1 and an average figure would be around 0.8. The power factor at the
+                                                        point of maximum kVA is a good indication of your current Power Factor. Detailed 
+                                                        below are some relevant figures that need to be considered when looking at Power 
+                                                        Factor. These figures are derived from 15 minute intervals.<br><br>")
+            Return PowerFactorHeading
+        End Function
+
+        Private Function GetPFSubHeading() As HTMLElementDIV
+            Dim PowerFactorSubHeading = New HTMLElementDIV("<br>Detailed in the graph below is the kW, kVA, kVAr And Power Factor 
+                                                            profile for " & Format(HighestDemandDate, "dddd dd-MMM-yyyy") & ". 
+                                                            This has been graphed In  " & Me.DefaultVA_DataStream.Interval & " 
+                                                            minute periods And will give a good indication Of the behaviour Of 
+                                                            your power factor during periods of maximum kVA demand.")
+            Return PowerFactorSubHeading
+        End Function
+
+        Private Function GetPFDetails() As HTMLElementDIV
+            Dim DivPowerFactor = New HTMLElementDIV
+            DivPowerFactor.ID = "DivPowerFactor"
+            DivPowerFactor.Controls.Add(GetPowerFactorData)
+            Return DivPowerFactor
+        End Function
+
+        Private Function GetGoodPFHeading() As HTMLElementDIV
+            Dim GoodPowerFactorHeading = New HTMLElementDIV("The Power Factor achieved at your site is good. The installation of Power 
+                                                            Factor correction at your site would have little effect on your
+                                                            supply capacity and your ongoing charges.<br/>Utilacor is able to provide solutions for Power Factor correction. 
+                                                            If you are experiencing supply capacity problems then please contact 
+                                                            Utilacor and we will be able to provide a complete report on the correction 
+                                                            of your Power Factor. Utilacor will be presenting solutions for correction 
+                                                            if there is a financial benefit by having your Power factor corrected.")
+            Return GoodPowerFactorHeading
+        End Function
+
+        Public Function GetBadPowerFacorHeading() As HTMLElementDIV
+
+            Dim BadPowerFactorHeading = New HTMLElementDIV("If your site is experiencing difficulties with supply capacity then an alternative to
+                                                            upgrading supply lines could be to correct your power factor.  By correcting this power
+                                                            factor you could also save a considerable amount of money on your monthly electricity costs.<br/>Utilacor is able to provide solutions for Power Factor correction. 
+                                                            If you are experiencing supply capacity problems then please contact 
+                                                            Utilacor and we will be able to provide a complete report on the correction of your
+                                                            Power Factor.Utilacor will be presenting solutions for correction if there is a financial 
+                                                            benefit by having your Power factor corrected.")
+
+            Return BadPowerFactorHeading
+        End Function
+
+#End Region
+
+#Region " Power Factor Data"
+
+        Private Function GetPowerFactorData() As HTMLElementDIV
+
+            Dim DivPowerFactor As New HTMLElementDIV
+            DivPowerFactor.Controls.Add(CreateRowDiv("Maximum KVA For this period (15 min)", Format(HighestDemand, "#,###,##0") & " kVA", "col-md-2"))
+            DivPowerFactor.Controls.Add(CreateRowDiv("Date and Time of max kVA", Format(HighestDemandDate, "ddd dd-MMM-yyyy hh:mm"), "col-md-2"))
+            DivPowerFactor.Controls.Add(CreateRowDiv("kW at " & Format(HighestDemandDate, "ddd dd-MMM-yyyy hh:mm"), Format(kWAtMaxkVA, "#,###,##0") & " KW", "col-md-2"))
+            DivPowerFactor.Controls.Add(CreateRowDiv("kVAr at  " & Format(HighestDemandDate, "ddd dd-MMM-yyyy hh:mm"), Format(kVArAtMaxkVA, "#,###,##0") & " kVAr", "col-md-2"))
+            DivPowerFactor.Controls.Add(CreateRowDiv("Power Factor at " & Format(HighestDemandDate, "ddd dd-MMM-yyyy hh:mm"), Format(PowerFactorAtMaxkVA, "0.00"), "col-md-2"))
+            Return DivPowerFactor
+        End Function
+
+        Private Function BadPowerFactorTableAsDiv() As HTMLElementDIV
+            Dim DivBadPowerFactorData = New HTMLElementDIV("<br/>")
+            DivBadPowerFactorData.Controls.Add(CreateRowDiv("Present current", Format(CurrentAtMaxkVA, "#,###,##0" & "Amps"), "col-md-1"))
+            DivBadPowerFactorData.Controls.Add(CreateRowDiv("With correction to 0.95", Format(CurrentAtMaxkVAWithCorrection(0.95), "#,###,##0" & "Amps"), "col-md-1"))
+            DivBadPowerFactorData.Controls.Add(CreateRowDiv("Decrease in current", Format(DecInCurr, "#,###,##0") & "Amps &nbsp;&nbsp;" & "Or &nbsp;&nbsp;" & Format(DecInCurrPer, "Percent"), "col-md-1"))
+            Return DivBadPowerFactorData
+        End Function
+
+        Private Function CreateRowDiv(str As String, val As String, className As String) As HTMLElementDIV
+            Dim mainDiv As New HTMLElementDIV("", "", "row")
+            Dim textDiv As New HTMLElementDIV("", "", className)
+            textDiv.SetInnerText(str)
+            textDiv.AddStyleAttribute("margin", "0")
+            Dim valDiv As New HTMLElementDIV("", "", className)
+            valDiv.SetInnerText(val)
+            valDiv.AddStyleAttribute("margin", "0")
+            mainDiv.Controls.Add(textDiv)
+            mainDiv.Controls.Add(valDiv)
+            Return mainDiv
+        End Function
+
+#End Region
+
+#Region " Calculations"
+
+        'Public Function CreateDataDayHighDeamand()
+        '    Dim locDataStreams
+        '    locDataStreams = GetDataStreams()
+        '    'Last Part of Month
+        '    With Me.User.Reports_Definitions.Item_By_Name("HTML_datGet_Data").ClassObject
+        '        With .CodeObject
+        '            .SDate = CDate(Format(HighestDemandDate, "dd-MMM-yyyy"))
+        '            .EDate = CDate(Format(HighestDemandDate, "dd-MMM-yyyy") & " 23:59:59")
+        '            .Name = "HighestkVADay"
+        '            .DataStreams = locDataStreams
+        '            .Interval = Me.DefaultWatts_DataStream.Interval
+        '        End With
+        '        Return .EvaluateAsText(False)
+        '    End With
+        'End Function
+
+        'Private Function GetDataStreams()
+        '    Dim LocDataStreams
+        '    Try
+        '        ReDim LocDataStreams(3, 3)
+        '        With Me.DefaultVA_DataStream
+        '            With Me.DefaultWatts_DataStream
+        '                LocDataStreams(0, 0) = .ID
+        '                LocDataStreams(1, 0) = .Name
+        '                LocDataStreams(2, 0) = 1    'First Y Axis
+        '                LocDataStreams(3, 0) = 2    'Bars
+        '            End With
+
+        '            LocDataStreams(0, 1) = .ID
+        '            LocDataStreams(1, 1) = .Name
+        '            LocDataStreams(2, 1) = 1    'First Y Axis
+        '            LocDataStreams(3, 1) = 1    'Lines
+        '        End With
+
+        '        With Me.DefaultVAr_DataStream
+        '            LocDataStreams(0, 2) = .ID
+        '            LocDataStreams(1, 2) = .Name
+        '            LocDataStreams(2, 2) = 1    'First Y Axis
+        '            LocDataStreams(3, 2) = 1    'Lines
+        '        End With
+
+        '        'Power Factor Data Stream
+        '        With Me.DefaultPF_DataStream
+        '            LocDataStreams(0, 3) = .ID
+        '            LocDataStreams(1, 3) = .Name
+        '            LocDataStreams(2, 3) = 2    'Second Y Axis
+        '            LocDataStreams(3, 3) = 1    'Lines
+        '        End With
+        '        Return LocDataStreams
+        '    Catch ex As Exception
+        '        Return ex.Message
+        '    End Try
+        'End Function
+
+        Public Function DecInCurr() As Decimal
+            Return (CurrentAtMaxkVA() - CurrentAtMaxkVAWithCorrection(0.95))
+        End Function
+
+        Public Function DecInCurrPer() As Decimal
+            Return (CurrentAtMaxkVA() - CurrentAtMaxkVAWithCorrection(0.95)) / CurrentAtMaxkVA()
+        End Function
+
+        Public Function CurrentAtMaxkVAWithCorrection(CorrectTo As Decimal) As Decimal
+            Try
+                Return CDbl(CurrentAtMaxkVA()) * PowerFactorAtMaxkVA() / CorrectTo
+            Catch ex As Exception
+                Throw ex
+            End Try
+        End Function
+
+        Public Function CurrentAtMaxkVA() As Decimal
+            Try
+                Return (HighestDemand() * 1000) / 415 / 3 ^ 0.5
+            Catch ex As Exception
+                Throw ex
+            End Try
+        End Function
+
+        Public Function HighestDemand() As Decimal
+            Try
+                If prvHighestDemand = 0 Then
+                    Dim Dat = Me.DefaultVA_DataStream
+                    prvHighestDemand = Convert.ToDecimal(Nz(CType(Me.User.Banks("252")("4").ClassObject.Periods(1), fltPeriod).GetValue(CDate(Me.StartDate), CDate(Me.EndDate),
+                     Dat.ID, fltActions.fltActionMax, 0, 0, Dat.Interval, False, prvHighestDemandDate, False), 0))
+                    If String.IsNullOrEmpty(prvHighestDemandDate) Then prvHighestDemandDate = Me.StartDate
+                    Select Case Dat.DataType
+                        Case 6, 8   'Data Stream was in Wh
+                            prvHighestDemand = (prvHighestDemand / 1000) * (60 / Dat.Interval)
+                        Case 3, 5   'Data Stream was in Watts
+                            prvHighestDemand = prvHighestDemand / 1000
+                    End Select
+                End If
+                Return prvHighestDemand
+            Catch ex As Exception
+                Return ex.Message
+            End Try
+        End Function
+
+        Public Function kWAtMaxkVA() As Decimal
+            Try
+                If prvkWAtMaxkVA = 0 Then
+                    Dim Dat = Me.DefaultWatts_DataStream
+                    Dim TableName = Dat.GetTableName(CDate(Me.StartDate), CDate(Me.EndDate), 0, False)
+                    prvkWAtMaxkVA = Convert.ToDecimal(Nz(Me.User.SQLLookUp("Value", CStr(TableName), "Date = '" & HighestDemandDate & "'"), 0))
+                    Select Case Dat.DataType
+                        Case 6, 8   'Data Stream was in Wh
+                            prvkWAtMaxkVA = (prvkWAtMaxkVA / 1000) * (60 / Dat.Interval)
+                        Case 3, 5   'Data Stream was in Watts
+                            prvkWAtMaxkVA = prvkWAtMaxkVA / 1000
+                    End Select
+                End If
+                Return prvkWAtMaxkVA
+            Catch ex As Exception
+                Throw ex
+            End Try
+        End Function
+
+        Public Function kVArAtMaxkVA() As Decimal
+            Try
+                If prvkVArAtMaxkVA = 0 Then
+                    Dim Dat = Me.DefaultVAr_DataStream
+                    Dim TableName = Dat.GetTableName(CDate(Me.StartDate), CDate(Me.EndDate), 0, False)
+                    prvkVArAtMaxkVA = Convert.ToDecimal(Nz(Me.User.SQLLookUp("Value", CStr(TableName), "Date = '" & HighestDemandDate & "'"), 0))
+                    Select Case Dat.DataType
+                        Case 7  'Data Stream was in VARh
+                            prvkVArAtMaxkVA = (prvkVArAtMaxkVA / 1000) * (60 / Dat.Interval)
+                        Case 4  'Data Stream was in VARs
+                            prvkVArAtMaxkVA = prvkVArAtMaxkVA / 1000
+                    End Select
+                End If
+                Return prvkVArAtMaxkVA
+            Catch ex As Exception
+                Throw ex
+            End Try
+        End Function
+
+        Public Function PowerFactorAtMaxkVA() As Decimal
+            Try
+                If prvPowerFactorAtMaxkVA = 0 Then
+                    Dim datStream As datDataStream = Me.DefaultPF_DataStream
+                    Dim tableName = datStream.GetTableName(CDate(Me.StartDate), CDate(Me.EndDate), 0, False)
+                    prvPowerFactorAtMaxkVA = Convert.ToDecimal(Nz(Me.User.SQLLookUp("Value", CStr(tableName), "Date = '" & HighestDemandDate & "'"), 0))
+
+                    Select Case datStream.DataType
+                        Case 7  'Data Stream was in VARh
+                            prvPowerFactorAtMaxkVA = (prvPowerFactorAtMaxkVA / 1000) * (60 / datStream.Interval)
+                        Case 4  'Data Stream was in VARs
+                            prvPowerFactorAtMaxkVA = prvPowerFactorAtMaxkVA / 1000
+                    End Select
+                End If
+                Return prvPowerFactorAtMaxkVA
+            Catch ex As Exception
+                Throw ex
+            End Try
+        End Function
+
+#End Region
+
+#Region " Default Code"
+
+        <ThreadStatic()>
+        Public Shared SharedMe As WEB_SitePowerFactorReport
+
+        'Private _Entities As Entities
+        '''' <summary>
+        '''' This should only be used when updating properties, not in any other code - when you need the entities you should
+        '''' create it yourself
+        '''' </summary>
+        '''' <value></value>
+        '''' <returns></returns>
+        '''' <remarks></remarks>
+        'Public ReadOnly Property Entities As Entities
+        '    Get
+        '        If Not _Entities Is Nothing Then
+        '            If _Entities.IsDisposed Then
+        '                _Entities = Nothing
+        '            End If
+        '        End If
+        '        If _Entities Is Nothing Then
+        '            _Entities = New Entities(Me.User)
+        '        End If
+
+        '        Return _Entities
+        '    End Get
+        'End Property
+
+        ''' <summary>
+        ''' This can be used to associate an icon with this report that is different to the underlying report
+        ''' You could set this within the SetDefaults, or you could create a get and set componet of the 
+        ''' property and override it
+        ''' </summary>
+        ''' <returns></returns>
+        Public Property ReportIcon As Icons Implements WebForm.ReportIcon
+
+        ''' <summary>
+        ''' Initialization code in here for this report.  This code will be called each time the report is ran
+        ''' other call reports should also call this before using the report output or any contained functions
+        ''' </summary>
+        ''' <remarks></remarks>
+        Public Sub SetDefaults() Implements defReport_Definitions.defReportDefinitionBase.SetDefaults
+            'Uncomment these lines if you have an entitites object
+            'If Not _Entities Is Nothing Then
+            '    _Entities.Dispose()
+            '    _Entities = Nothing
+            'End If
+
+            SharedMe = Me
+        End Sub
+
+        ''' <summary>
+        ''' This is a callback that is called after the report if produced.  The report is a document of type Word, Excel, Email or RTF
+        ''' This depends on the type of report produced
+        ''' </summary>
+        ''' <param name="ReportObj">The Report object</param>
+        ''' <remarks></remarks>
+        Public Sub AfterReportProduce(ByVal ReportObj As Object) Implements defReport_Definitions.defReportDefinitionBase.AfterReportProduce
+        End Sub
+
+        ''' <summary>
+        ''' The callback is called after the file has been saved to kWatch.  The file object is a referances to the filFile object that has 
+        ''' just been saved
+        ''' </summary>
+        ''' <param name="File">The newly saved file</param>
+        ''' <remarks></remarks>
+        ''' 
+        Public Sub AfterFileSave(ByVal File As kWatchServer.filFile) Implements defReport_Definitions.defReportDefinitionBase.AfterFileSave
+        End Sub
+
+
+        ''' <summary>
+        ''' This is the web request object that has been passed back from the originating call. This contains
+        ''' information relating to the browser, the call been made and the IIS server that the call came from.
+        ''' This is a copy of the request object that is generated by the server 
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Property Request As UserRequest Implements WebForm.Request
+
+        ''' <summary>
+        ''' This is the WebSite that this request belongs to
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Property Web As webWebSite Implements WebForm.Web
+
+        ''' <summary>
+        ''' This is the webContact that relatest to this request
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Property WebContact As webContactLogin Implements WebForm.WebContact
+
+#Region "Settings"
+
+        ''' <summary>
+        ''' This will return the settings object as a dynamic expando object that you can review and edit.  If you
+        ''' want your settings object casted to a specific type, use the GetSettings function.  Setting an object
+        ''' to this location will also update the settings object for you as well
+        ''' 
+        ''' This will get the settings object for this report object.  Settings objects are unique based on
+        ''' the RunReportID, LoggedInContact (either web or local), The active WebID or web site, a DashboardwidgetID and
+        ''' optionaly a SettingsLocationID that you might choose to use.
+        ''' 
+        ''' So for a kWatch report delivered within kWatch - this would be unique based on RunReportID and contactID only as
+        ''' webID, DashboardwidgetID and SettinglocationID are all nothing
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Property Settings As Object Implements WebForm.Settings
+            Get
+                Return WebManagement.SettingsManagement.GetSettings(Me) ' Newtonsoft.Json.JsonConvert.DeserializeObject(Of ExpandoObject)(Me.SettingsRecord.SettingsObject)
+            End Get
+            Set(value As Object)
+                WebManagement.SettingsManagement.SaveSettings(value, Me)
+            End Set
+        End Property
+
+        ''' <summary>
+        ''' This will return the settings object as a dynamic expando object that you can review and edit.  If you
+        ''' want your settings object casted to a specific type, use the GetSettings function.  Setting an object
+        ''' to this location will also update the settings object for you as well
+        ''' 
+        ''' This will get the settings object for this report object.  Settings objects are unique based on
+        ''' the RunReportID, LoggedInContact (either web or local), The active WebID or web site, a DashboardwidgetID and
+        ''' optionaly a SettingsLocationID that you might choose to use.
+        ''' 
+        ''' So for a kWatch report delivered within kWatch - this would be unique based on RunReportID and contactID only as
+        ''' webID, DashboardwidgetID and SettinglocationID are all nothing
+        ''' </summary>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Function GetSettings(Of SettingObjectType)() As SettingObjectType Implements WebForm.GetSettings
+
+            Return WebManagement.SettingsManagement.GetSettings(Of SettingObjectType)(Me)
+
+        End Function
+
+        ''' <summary>
+        ''' This will save the settings object to the database
+        ''' </summary>
+        ''' <typeparam name="SettingObjectType"></typeparam>
+        ''' <param name="Obj"></param>
+        ''' <remarks></remarks>
+        Public Sub SaveSettings(Of SettingObjectType)(Obj As SettingObjectType) Implements WebForm.SaveSettings
+
+            WebManagement.SettingsManagement.SaveSettings(Obj, Me)
+
+        End Sub
+
+        ''' <summary>
+        ''' This is a global property that if set - will be used as a reportProperties object by the dash-board component
+        ''' You do not need to set this - and it is set if this report is used as 
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        <kWHTML.kWForms.reportProperty>
+        Public Property DashboardWidgetID As Integer? Implements WebForm.DashboardWidgetID
+        ''' <summary>
+        ''' This will get the settings record for this report object.  Settings objects are created and unique based on
+        ''' the RunReportID, LoggedInContact (either web or local), The active WebID or web site, a dash-board Widget ID and
+        ''' optionaly a SettingsLocationID that you might choose to use.
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public ReadOnly Property SettingsRecord As defReportSetting Implements WebForm.SettingsRecord
+            Get
+                Return WebManagement.SettingsManagement.GetSettingsRecord(Me)
+            End Get
+        End Property
+
+
+        ''' <summary>
+        ''' This will return the guid that is used within the report object
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public ReadOnly Property ReportPropertiesGuid As Guid Implements WebForm.ReportPropertiesGuid
+            Get
+                Return WebManagement.SettingsManagement.getReportPropertiesGuid(Me)
+            End Get
+        End Property
+
+        ''' <summary>
+        ''' This wil return the report properties object for this report
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public ReadOnly Property ReportProperties As Object Implements WebForm.ReportProperties
+            Get
+                Return WebManagement.SettingsManagement.GetReportProperties(Me)
+            End Get
+        End Property
+#End Region
+
+
+
+
+#End Region
+
+    End Class
+End Namespace

@@ -1,0 +1,914 @@
+Imports kWGlobalFunctions.kWGlobalsShared
+Imports kWHTML.Elements
+Imports WebManagement
+Imports kWHTML.kWForms
+Imports kWHTML.kWTables
+Imports kWHTML
+Imports System.Text
+
+Namespace kWatchServer.tskTaskErrors
+    ''' <summary>"
+    ''' Define all custom code for this assembly within this class 
+    ''' </summary>
+    ''' <remarks></remarks>
+
+    Public Class WEBHTML_kWItems
+        Implements WebForm
+
+        Public DivisionTotalSaved As HTMLElementDIV
+        Public CSSInclude As Boolean  'This will include the style sheet
+        Public AllowOpen As Boolean        'If this is true it will provide a means to open the Task Error
+        Public ReadOnlyy As Boolean
+        Public ReturnTableOnly As Boolean
+        Public Expanded As Boolean
+        Public ShowExpand As Boolean
+
+        'Testing 
+        Public Property Condition As Boolean = True
+        'Testing End Vivek
+
+        ' ''' <summary>
+        ' ''' Example - This can be used as a report property - note the <reportProperty>  attribute that has been applied
+        ' ''' </summary>
+        ' ''' <value></value>
+        ' ''' <returns></returns>
+        ' ''' <remarks></remarks>
+        '<reportProperty>
+        'Public Property SiteID As Integer
+
+
+        ''' <summary>
+        ''' Main function that is returned to the lines of the report when it is ran
+        ''' </summary>
+        ''' <param name="html"></param>
+        ''' <remarks></remarks>
+        Public Sub GetReport(html As HTMLTextWriterkWatch) Implements WebForm.GetReport
+            Dim repBase = GetReportBase()
+            repBase.ToString(html)
+        End Sub
+
+
+        Public Function GetReportBase() As HTMLkWFormBase Implements WebForm.GetReportBase
+            'Create the form base object
+            Dim Form = HTMLkWFormBase.Create(Me)
+            Form.onLoadFormBase = "onLoadFormBase1662"  'make sure this matches the onLoadFormBase name
+            Form.JScript.Add(My.Resources.ClientScript)
+            Form.IncludeHeader = False
+
+            GetAllcontrols(Form)
+
+            'Dim Stringfg As String = GetTaskErrors(False, False, False, False, False)
+            'Dim htmlTable = New HTMLText(Stringfg)
+            'Form.FormSectionMain.Add(htmlTable)
+            'Dim xyz = Me.User.Get_Item_Object("437~73427", True).ClassObject
+            'Form.FormSectionMain.Add(ErrorReport(xyz))
+
+
+            Return Form
+        End Function
+
+
+        Public Sub GetAllcontrols(Form As HTMLkWFormBase(Of WEBHTML_kWItems))
+            Dim DivResolvedTable As New HTMLElementDIV()
+            'GetResolvedTable
+            'GetResolvedTable
+            'GetResolvedTableTestingWithNewFunction
+            DivResolvedTable.Controls.Add(GetResolvedTable)
+            Form.FormSectionMain.Add(DivResolvedTable)
+            AccountErrorList()
+
+        End Sub
+
+        Public Class AccountError
+            Public ID As Integer
+            Public Account As actAccount
+            Public Errors As List(Of tskTaskError)
+        End Class
+
+        Public Function AccountErrorList() As List(Of AccountError)
+            Dim lst As New List(Of AccountError)
+            Dim ItemCount = 0
+            For Each err As tskTaskError In Me.ClassObject
+                If err.Account Is Nothing Then
+                    If Not lst.Exists(Function(c) c.Account Is Nothing) Then
+                        lst.Add(New AccountError With {.ID = ItemCount = +1, .Account = Nothing, .Errors = New List(Of tskTaskError)})
+                    End If
+                Else
+                    If Not lst.Exists(Function(c) c.Account.ID = err.AccountID) Then
+                        lst.Add(New AccountError With {.ID = ItemCount = +1, .Account = err.Account, .Errors = New List(Of tskTaskError)})
+                    End If
+                End If
+            Next
+
+            For Each err As tskTaskError In Me.ClassObject
+                If err.Account Is Nothing Then
+                    lst.Find(Function(c) c.Account Is Nothing).Errors.Add(err) '(New AccountError With {.ID = ItemCount = +1, .Account = Nothing, .Errors = New List(Of tskTaskError)})
+                Else
+                    lst.Find(Function(c) c.Account.ID = err.AccountID).Errors.Add(err)
+                End If
+            Next
+
+            Return lst
+        End Function
+
+        Public Function ReturnAccounts()
+            'This will display a list of accounts that realte to this these errors
+            Dim AcAr
+            Dim AcArCount
+            Dim FoundIt
+            Dim SetUp
+            Dim Items
+            Dim ActStr
+            Dim It
+            Dim Count1
+            Dim tmpAr
+
+            Dim ErrIt
+
+            If Me.Count > 0 Then
+                ReDim AcAr(2, 0)
+                AcArCount = 0
+
+                For Each It In Me
+                    It = It.ClassObject
+                    If AcArCount > 0 Then
+                        FoundIt = False
+                        For Count1 = 0 To AcArCount - 1
+                            'If IsObject(AcAr(0, Count1)) Then
+                            If Not AcAr(0, Count1) Is Nothing Then
+                                If It.AccountID = AcAr(0, Count1).ID Then
+                                    FoundIt = True
+                                    Exit For
+                                End If
+                            Else
+                                If It.Account Is Nothing Then
+                                    'This means that it has found the array element that represents errors that have not account related to them
+                                    FoundIt = True
+                                    Exit For
+                                End If
+                            End If
+                        Next
+                    End If
+
+                    If FoundIt = False Then
+                        ReDim Preserve AcAr(2, AcArCount)
+                        If Not It.Account Is Nothing Then
+                            AcAr(0, AcArCount) = It.Account
+                            AcAr(2, AcArCount) = It.Account.SDate
+                            AcArCount = AcArCount + 1
+                        Else
+                            AcAr(0, AcArCount) = Nothing
+                            'AcAr(0, AcArCount) = Empty
+                            AcArCount = AcArCount + 1
+                        End If
+                    End If
+                Next
+                'SortArray_2_Dim (vArray:=<<Variant>>, SortCol:=<<Integer>>, Ascending:=True, lower:=<<Opt Variant>>, upper:=<<Opt Variant>>)
+                'Sort the accounts by there date
+                SortArray_2_Dim(AcAr, 2, True)
+                ActStr = ""
+                If AcArCount > 0 Then
+                    For Count1 = 0 To AcArCount - 1
+                        For Each ErrIt In Me
+                            ErrIt = ErrIt.ClassObject
+                            If ErrIt.Account Is Nothing Then
+                                'This means it does not relate to an account at all.
+                                If AcAr(0, Count1) Is Nothing Then
+                                    tmpAr = AcAr(1, Count1)
+                                    If IsArray(tmpAr) Then
+                                        ReDim Preserve tmpAr(UBound(tmpAr) + 1)
+                                    Else
+                                        ReDim tmpAr(0)
+                                    End If
+                                    tmpAr(UBound(tmpAr)) = ErrIt
+                                    'Return the array back to the main array
+                                    AcAr(1, Count1) = tmpAr
+                                End If
+                            Else
+                                If Not AcAr(0, Count1) Is Nothing Then
+                                    If ErrIt.AccountID = AcAr(0, Count1).ID Then
+                                        tmpAr = AcAr(1, Count1)
+                                        If IsArray(tmpAr) Then
+                                            ReDim Preserve tmpAr(UBound(tmpAr) + 1)
+                                        Else
+                                            ReDim tmpAr(0)
+                                        End If
+                                        tmpAr(UBound(tmpAr)) = ErrIt
+                                        'Return the array back to the main array
+                                        AcAr(1, Count1) = tmpAr
+                                    End If
+                                End If
+                            End If
+                        Next
+                    Next
+
+                End If
+            End If
+            Return AcAr
+        End Function
+
+        ''' <summary>
+        ''' This will display a list Error (the Main Table )
+        ''' </summary>
+        ''' <returns></returns>
+
+
+        Public Function GetResolvedTable() As kWTable
+            Dim AcAr
+            Dim Count1
+            Dim Count2
+            Dim tmpAr
+            Dim ErrStr
+            Dim Act
+            Dim ErrIt
+            Dim TotalErrors
+            Dim TotalAllErrors
+            Dim TotalResolved
+            Dim TotalUnResolved
+            Dim TotalAllResolved
+            Dim TotalAllUnResolved
+            Dim TotalStatus
+            Dim Item As New List(Of ClsTaskMainTable)
+            Dim ItemElse As New List(Of ClsErrorResolvedElse)
+            AcAr = AccountErrorList()
+            ErrStr = ""
+            TotalAllErrors = 0
+            TotalAllResolved = 0
+            TotalAllUnResolved = 0
+            Count1 = 0
+            Dim checkSt = 0
+            For i = 0 To AcAr.Count - 1
+                If Not AcAr(i).Account Is Nothing Then
+                    tmpAr = AcAr(i).Errors
+                    TotalErrors = 0
+                    TotalResolved = 0
+                    TotalUnResolved = 0
+                    TotalStatus = ""
+
+                    For Count2 = 0 To AcAr(i).Errors.Count - 1
+                        With tmpAr(Count2)
+                            TotalErrors = TotalErrors + .ErrorAmount
+                            If .Resolved Then
+                                TotalResolved = TotalResolved + .ResolutionAmount
+                                If Len(TotalStatus) = 0 Then
+                                    TotalStatus = "True"
+                                Else
+                                    If TotalStatus = "False" Then
+                                        TotalStatus = "Partially"
+                                    End If
+                                End If
+                            Else
+                                TotalUnResolved = TotalUnResolved + .ErrorAmount
+
+                                If TotalStatus = "True" Then
+                                    TotalStatus = "Partially"
+                                Else
+                                    TotalStatus = "False"
+                                End If
+                            End If
+
+                        End With
+                    Next
+                    TotalAllErrors = TotalAllErrors + TotalErrors
+                    TotalAllResolved = TotalAllResolved + TotalResolved
+                    TotalAllUnResolved = TotalAllUnResolved + TotalUnResolved
+                    Dim ListOfErrorID As New List(Of Int32)
+                    If Len(TotalStatus) = 0 Then TotalStatus = "False"
+                    For Count2 = 0 To tmpAr.Count - 1
+                        ErrIt = tmpAr(Count2)
+                        ListOfErrorID.Add(ErrIt.ID)
+                    Next
+                    Item.Add(New ClsTaskMainTable With {.ID = AcAr(i).Account.ID, .TempraryError = AcAr(i).Account.ID, .ErrorItProp = ErrIt, .RetailerName = AcAr(i).Account.PricingStructure.RetailerName,
+                                         .Accountnumber = AcAr(i).Account.Retailer_Account_Number, .Billnumber = AcAr(i).Account.Bill_Number,
+                                         .ActSdate = Format(AcAr(i).Account.SDate, "dd-MMM-yyyy"), .amount = FormatCurrency(TotalErrors), .Totalstatus = TotalStatus, .TotalResolved = FormatCurrency(TotalResolved), .TotalUnResolved = FormatCurrency(TotalUnResolved)})
+
+                End If
+            Next
+            Dim MainTable = kWTable.Create(Me, "Maintable", Item, "GetResolvedTable()", onGetSubTableEventDelegate:=Function(ControlInfo, Obj)
+                                                                                                                        Return SubTable(Obj.TempraryError)
+                                                                                                                    End Function)
+
+            MainTable.AddColumn("ID", Function(c) c.ID)
+            MainTable.AddColumn("Retailer", Function(c) c.RetailerName)
+            MainTable.AddColumn("Account Num", Function(c) c.Accountnumber)
+            MainTable.AddColumn("Bill Number", Function(c) c.Billnumber)
+            MainTable.AddColumn("SDate", Function(c) c.ActSdate)
+            MainTable.AddColumn("Amount", Function(c) c.amount)
+            MainTable.AddColumn("Resolved", Function(c) c.Totalstatus)
+            MainTable.AddColumn("Res Amount ", Function(c) c.TotalResolved)
+            MainTable.AddColumn("Un Res Amount", Function(c) c.TotalUnResolved)
+
+            'MainTable.IncludeIcon = False
+            'MainTable.IncludeOpen = False
+            'MainTable.IncludeExpandAllButton = False
+            'MainTable.TableOptions.ordering = False
+            'MainTable.Expanded = True
+
+            Return MainTable
+        End Function
+
+        Public Function SubTable(IDForError) As HTMLElementDIV
+            Dim AcAr
+            Dim Errors
+            Dim ControlsDiv As New HTMLElementDIV
+            Dim Str As String = ""
+            Dim ErrIt
+            Dim ItmeSubTable As New List(Of clsSubTableErrorResolved)
+            Dim Count2 = Nothing
+            'Dim AccObj As actAccount = Me.User.Get_Item_Object("319~" & IDForError).ClassObject
+            'Dim aa = AccObj.TaskErrors.Count
+            AcAr = AccountErrorList()
+            Dim Value = AcAr.Count
+            For i = 0 To AcAr.Count - 1
+                If TypeOf (AcAr(i).Account) Is Object Then
+                    If Not AcAr(i).Account Is Nothing Then
+                        If AcAr(i).Account.ID = IDForError Then
+                            Errors = AcAr(i).Errors
+                        End If
+                    End If
+                End If
+            Next
+            For Each Errs In Errors
+                ErrIt = Errs
+                ItmeSubTable.Add(New clsSubTableErrorResolved With {.Id = ErrIt.ID, .ErrorItTemp = ErrIt.ID, .Description = ErrIt.Description, .Errortype = IIF(ErrIt.ErrorType = 1, "Usage", "Rate"),
+                                        .errorCalcBasis = IIF(ErrIt.ErrorCalculationBasis = 1, "Billed", "kWatch"), .Erroramount = FormatCurrency(ErrIt.ErrorAmount),
+                                        .Resolved = IIF(ErrIt.Resolved, "Resolved", "UnResolved"), .ResolutionAmount = FormatCurrency(ErrIt.ResolutionAmount)
+                                        })
+            Next
+            'Dim TableSub = kWTable.Create(Me, "TableSub", ItmeSubTable, "SubTable(" & tmpAr & "," & ErrIt & ")", onGetSubTableEventDelegate:=Function(ControlInfo, Obj)
+            '                                                                                                                                     Return ErrorReport(Obj.ErrorItTemp)
+            '                                                                                                                                 End Function)
+            'SubTable(tmpAr).onGetSubTableEventDelegate.invoke()
+            Dim TableSub = kWTable.Create(Me, "TableSub", ItmeSubTable, "SubTable(" & IDForError & ")", onGetSubTableEventDelegate:=Function(ControlInfo, Obj)
+                                                                                                                                        Return (ErrorReport(Obj.ErrorItTemp))
+                                                                                                                                    End Function)
+            TableSub.AddColumn("ID", Function(c) c.Id)
+            TableSub.AddColumn("Description", Function(c) c.Description)
+            TableSub.AddColumn("ErrorType", Function(c) c.Errortype)
+            TableSub.AddColumn("Error Calculation Basis", Function(c) c.errorCalcBasis)
+            TableSub.AddColumn("Error Amount", Function(c) c.Erroramount)
+            TableSub.AddColumn("Resolved", Function(c) c.Resolved)
+            TableSub.AddColumn("Resolution Amount", Function(c) c.ResolutionAmount)
+
+            Return TableSub
+
+        End Function
+
+        ''' <summary>
+        ''' Oh Mah God!
+        ''' </summary>
+        ''' <param name="ErrorIT"></param>
+        ''' <returns></returns>
+        Public Function ErrorReport(ID As Object) As HTMLElementDIV
+            Dim ErrorIT = Me.User.Get_Item_Object("437~" & ID).ClassObject
+            Dim DivControls = New HTMLElementDIV
+            Dim targetReport As defRun_Report_Definition = ErrorIT.Reports_Definitions.Item_By_Name("WEBHTML_tskTaskErrors").ClassObject
+            Dim WebForm = SettingsManagement.GetRunReport(targetReport, Me)
+            CObj(WebForm).SetDefaults
+            CObj(WebForm).CSSInclude = True
+            If ReadOnlyy = False Then
+                CObj(WebForm).FormReturnType = 1
+            Else
+                CObj(WebForm).FormReturnType = 2
+            End If
+            CObj(WebForm).AllowOpen = AllowOpen
+            DivControls.Controls.Add(WebForm.GetReportBase)
+            Return DivControls
+        End Function
+        '************************************ This Function should be changed To The New one *************************************************************
+        Public Function GetTaskErrors(ReadOnlyy, ExpandedLevel1, ExpandedLevel2, AllowExpand, AllowOpenAccount)
+
+            Dim AcAr
+            Dim Count1
+            Dim Count2
+            Dim tmpAr
+            Dim ErrStr
+            Dim Act
+            Dim ErrIt
+            Dim TotalErrors
+            Dim TotalAllErrors
+            Dim TotalResolved
+            Dim TotalUnResolved
+            Dim TotalAllResolved
+            Dim TotalAllUnResolved
+            Dim TotalStatus
+
+            AcAr = ReturnAccounts()
+            ErrStr = ""
+            TotalAllErrors = 0
+            TotalAllResolved = 0
+            TotalAllUnResolved = 0
+            Count1 = 0
+
+            If IsArray(AcAr) Then
+                For Count1 = 0 To UBound(AcAr, 2)
+                    If Not AcAr(0, Count1) Is Nothing Then
+                        Act = AcAr(0, Count1)
+                    Else
+                        Act = Nothing
+                    End If
+                    tmpAr = AcAr(1, Count1)
+
+                    TotalErrors = 0
+                    TotalResolved = 0
+                    TotalUnResolved = 0
+                    TotalStatus = ""
+                    If IsArray(tmpAr) Then
+                        For Count2 = 0 To UBound(tmpAr)
+                            With tmpAr(Count2)
+                                TotalErrors = TotalErrors + .ErrorAmount
+                                If .Resolved Then
+                                    TotalResolved = TotalResolved + .ResolutionAmount
+                                    If Len(TotalStatus) = 0 Then
+                                        TotalStatus = "True"
+                                    Else
+                                        If TotalStatus = "False" Then
+                                            TotalStatus = "Partially"
+                                        End If
+                                    End If
+                                Else
+                                    TotalUnResolved = TotalUnResolved + .ErrorAmount
+
+                                    If TotalStatus = "True" Then
+                                        TotalStatus = "Partially"
+                                    Else
+                                        TotalStatus = "False"
+                                    End If
+                                End If
+
+                                'If .Amount <> 0 Then
+                                '	TotalErrors = TotalErrors +  .Amount
+                                'Else
+                                '	If .ErrorType = 1 Then
+                                '		TotalErrors = TotalErrors + (.ErrorUsage - .ActualUsage) * .ActualRate
+                                '	Else
+                                '		TotalErrors = TotalErrors + (.ErrorRate - .ActualRate) * .ActualUsage
+                                '	End IF
+                                'End IF
+                            End With
+                        Next
+
+                        TotalAllErrors = TotalAllErrors + TotalErrors
+                        TotalAllResolved = TotalAllResolved + TotalResolved
+                        TotalAllUnResolved = TotalAllUnResolved + TotalUnResolved
+                        If Len(TotalStatus) = 0 Then TotalStatus = "False"
+                        'Array("Icon", "ID", "PricingStructure.RetailerName:Retailer", "SDate", "kWTotalUsage / 4000:Usage", "kWAccountCharges:Charges", "ErrorsCriticalTotal:Errors", "ErrorNote:Error Note")
+
+                        If TypeOf (Act) Is Object Then
+                            If AllowExpand Then
+                                ErrStr = ErrStr & "<TR CLASS=HIGHLIGHT BACKGROUNDHIGHLIGHT=YES ROWHIDE=YES ROWDISPLAY=" & IIF(ExpandedLevel1, "YES", "NO") & ">"
+                            Else
+                                ErrStr = ErrStr & "<TR>"
+                            End If
+
+                            If AllowExpand Then
+                                ErrStr = ErrStr & "<TD>" _
+                            & "<IMG TITLE=""View Errors"" src=""../icons/plus.gif"">" _
+                        & "</TD>"
+                            End If
+
+                            ErrStr = ErrStr & "<TD><IMG SRC=""../iconsbmp/" & Act.Icon & ".bmp"" Width=16px></TD>" _
+                    & "<TD>" & Act.ID & "</TD>" _
+                    & "<TD>" & Act.PricingStructure.RetailerName & "</TD>" _
+                    & "<TD>" & Act.Retailer_Account_Number & "</TD>" _
+                    & "<TD>" & Act.Bill_Number & "</TD>" _
+                    & "<TD>" & Format(Act.SDate, "dd-mmm-yyyy") & "</TD>" _
+                    & "<TD>" & FormatCurrency(TotalErrors) & "</TD>" _
+                    & "<TD>" & TotalStatus & "</TD>" _
+                    & "<TD>" & FormatCurrency(TotalResolved) & "</TD>" _
+                    & "<TD>" & FormatCurrency(TotalUnResolved) & "</TD>"
+
+                            If AllowOpenAccount Then
+                                If RunLocal Then
+                                    ErrStr = ErrStr & "<TD><INPUT TITLE=""Open Electricity Account"" TYPE=image SRC=""../icons/open.gif"" Width=16px OnClick='VbScript:BrowserControl.User.OpenItem """ & Act.LongID & """ " & vbCrLf _
+                                                                            & "Window.Event.cancelBubble = True  '></TD>"
+                                Else
+                                    ErrStr = ErrStr & "<TD><A HREF=""../ASPx/GetFile.aspx?File_ID=" & Act.Account_File_ID & "&NewWindow=yes"" OnClick='VbScript:Window.Event.CancelBubble = True'> <IMG STYLE=""border:0px none white"" TITLE=""Open Electricity Account"" src=""../icons/open.gif""></A></TD>"
+                                End If
+                            End If
+
+                        Else
+                            'This is the Errors that have no specific account
+                            If AllowExpand Then
+                                ErrStr = ErrStr & "<TR CLASS=HIGHLIGHT BACKGROUNDHIGHLIGHT=YES ROWHIDE=YES ROWDISPLAY=" & IIF(ExpandedLevel1, "YES", "NO") & ">"
+                            Else
+                                ErrStr = ErrStr & "<TR>"
+                            End If
+
+                            If AllowExpand Then
+                                ErrStr = ErrStr & "<TD>" _
+                            & "<IMG TITLE=""View Errors"" src=""../icons/plus.gif"">" _
+                        & "</TD>"
+                            End If
+
+                            ErrStr = ErrStr & "<TD><IMG SRC=""../iconsbmp/TaskErrors.bmp"" Width=16px></TD>" _
+                    & "<TD></TD>" _
+                    & "<TD>Other Discrepancies</TD>" _
+                    & "<TD></TD>" _
+                    & "<TD></TD>" _
+                    & "<TD></TD>" _
+                    & "<TD>" & FormatCurrency(TotalErrors) & "</TD>" _
+                    & "<TD>" & TotalStatus & "</TD>" _
+                    & "<TD>" & FormatCurrency(TotalResolved) & "</TD>" _
+                    & "<TD>" & FormatCurrency(TotalUnResolved) & "</TD>" _
+                    & "<TD></TD>"
+                        End If
+
+                        ErrStr = ErrStr & "</TR>"
+
+                        If ExpandedLevel1 = True Or AllowExpand = True Then
+
+                            ErrStr = ErrStr & "<TR STYLE=""Display:" & IIF(ExpandedLevel1, "block", "none") & """>" _
+                        & "<TD></TD>" _
+                        & "<TD colSpan=12><TABLE Width=100% Border=1 cellspacing=0>"
+
+
+                            For Count2 = 0 To UBound(tmpAr)
+                                ErrIt = tmpAr(Count2)
+                                'Array("Icon", "ID", "Description", "Array("""", ""Usage"",""Rate"")(Item.ErrorType):Type", "Array("""", ""Billed"",""kWatch"")(Item.ErrorCalculationBasis):Calc meth", "Amount", AmountCalc & ":AmountCalc")
+                                'IIF(Item.ErrorType = 1, (Item.ErrorUsage - Item.ActualUsage) * Item.ActualRate, (Item.ErrorRate - Item.ActualRate) * Item.ActualUsage)
+                                If AllowExpand Then
+                                    ErrStr = ErrStr & "<TR CLASS=HIGHLIGHT BACKGROUNDHIGHLIGHT=YES ROWHIDE=YES ROWDISPLAY=" & IIF(ExpandedLevel2, "YES", "NO") & ">"
+                                Else
+                                    ErrStr = ErrStr & "<TR>"
+                                End If
+
+
+                                If AllowExpand Then
+                                    ErrStr = ErrStr & "<TD>" _
+                                & "<IMG TITLE=""View Errors"" src=""../icons/plus.gif"">" _
+                            & "</TD>"
+                                End If
+
+                                ErrStr = ErrStr & "<TD><IMG SRC=""../iconsbmp/" & ErrIt.Icon & ".bmp"" Width=16px></TD>" _
+                                & "<TD>" & ErrIt.ID & "</TD>" _
+                                & "<TD>" & ErrIt.Description & "</TD>" _
+                                & "<TD>" & (ErrIt.ErrorType) & "</TD>" _
+                                & "<TD>" & (ErrIt.ErrorCalculationBasis) & "</TD>" _
+                                & "<TD>" & FormatCurrency(ErrIt.ErrorAmount) & "</TD>" _
+                                & "<TD>" & IIF(ErrIt.Resolved, "Resolved", "UnResolved") & "</TD>" _
+                                & "<TD>" & FormatCurrency(ErrIt.ResolutionAmount) & "</TD>" _
+                            & "</TR>" & vbCrLf
+
+                                If (ExpandedLevel2 = True And ExpandedLevel1 = True) Or AllowExpand = True Then
+
+                                    ErrStr = ErrStr & "<TR STYLE=""Display:" & IIF(ExpandedLevel2, "block", "none") & """>" & vbCrLf _
+                                & "<TD></TD>" & vbCrLf _
+                                & "<TD colspan=10>" & vbCrLf
+
+
+                                    With ErrIt.Reports_Definitions.Item_By_Name("LOCALHTML_tskTaskError").ClassObject
+                                        With .CodeObject
+                                            .SetDefaults
+                                            .CSSInclude = False
+                                            If ReadOnlyy = False Then
+                                                .FormReturnType = 1
+                                            Else
+                                                .FormReturnType = 2
+                                            End If
+                                            .AllowOpen = AllowOpenAccount
+
+                                        End With
+                                        ErrStr = ErrStr & .EvaluateAsText(False) & "</TD></TR>"
+                                    End With
+                                End If
+
+
+                            Next
+                            ErrStr = ErrStr & "</TABLE></TD></TR>"
+                        End If
+                    End If
+                Next
+            End If
+            GetTaskErrors = "<TABLE CellSpacing=0 Border=1>" & vbCrLf _
+        & "<TR>" _
+            & IIF(AllowExpand, "<TD></TD>" & vbCrLf, "") _
+            & "<TD></TD>" & vbCrLf _
+            & "<TD><B>ID</B></TD>" & vbCrLf _
+            & "<TD><B>Retailer</B></TD>" & vbCrLf _
+            & "<TD><B>Acc Num</B></TD>" & vbCrLf _
+            & "<TD><B>Bill Num</B></TD>" & vbCrLf _
+            & "<TD><B>Act SDate</B></TD>" & vbCrLf _
+            & "<TD><B>Amount</B></TD>" & vbCrLf _
+            & "<TD><B>Resolved</B></TD>" & vbCrLf _
+            & "<TD><B>Res Amt</B></TD>" & vbCrLf _
+            & "<TD><B>Un Res Amt</B></TD>" & vbCrLf _
+        & "</TR>" & vbCrLf _
+            & ErrStr _
+        & "<TR>" & vbCrLf _
+            & "<TD ColSpan=" & IIF(AllowExpand, 7, 6) & " Align=right><B>TOTAL</B></TD>" & vbCrLf _
+            & "<TD><B>" & FormatCurrency(TotalAllErrors) & "</B></TD>" & vbCrLf _
+            & "<TD></TD>" & vbCrLf _
+            & "<TD><B>" & FormatCurrency(TotalAllResolved) & "</B></TD>" & vbCrLf _
+            & "<TD><B>" & FormatCurrency(TotalAllUnResolved) & "</B></TD>" & vbCrLf _
+        & "</TR>" & vbCrLf _
+    & "</TABLE>" & vbCrLf
+        End Function
+
+        ''' <summary>
+        ''' This is the function that is called when you need to refresh the form base object
+        ''' </summary>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Function RefreshFormBase() As String Implements WebForm.RefreshFormBase
+
+            'Get the report
+            Dim repBase As HTMLkWFormBase(Of WEBHTML_kWItems) = GetReportBase()
+            'This will exclude the jscript code and other items
+            repBase.RefreshPageCall = True
+            Dim html As New HTMLTextWriterkWatch
+            repBase.ToString(html)
+            'Return the string that contains the main contents of this report with extras
+            Return html.ToString
+
+        End Function
+
+#Region "Default Code"
+
+        <ThreadStatic()>
+        Public Shared SharedMe As WEBHTML_kWItems
+
+        'Private _Entities As Entities
+        '''' <summary>
+        '''' This should only be used when updating properties, not in any other code - when you need the entities you should
+        '''' create it yourself
+        '''' </summary>
+        '''' <value></value>
+        '''' <returns></returns>
+        '''' <remarks></remarks>
+        'Public ReadOnly Property Entities As Entities
+        '    Get
+        '        If Not _Entities Is Nothing Then
+        '            If _Entities.IsDisposed Then
+        '                _Entities = Nothing
+        '            End If
+        '        End If
+        '        If _Entities Is Nothing Then
+        '            _Entities = New Entities(Me.User)
+        '        End If
+
+        '        Return _Entities
+        '    End Get
+        'End Property
+
+        ''' <summary>
+        ''' This can be used to associate an icon with this report that is different to the underlying report
+        ''' You could set this within the SetDefaults, or you could create a get and set componet of the 
+        ''' property and override it
+        ''' </summary>
+        ''' <returns></returns>
+        Public Property ReportIcon As Icons Implements WebForm.ReportIcon
+
+        ''' <summary>
+        ''' Initialization code in here for this report.  This code will be called each time the report is ran
+        ''' other call reports should also call this before using the report output or any contained functions
+        ''' </summary>
+        ''' <remarks></remarks>
+        Public Sub SetDefaults() Implements defReport_Definitions.defReportDefinitionBase.SetDefaults
+
+            CSSInclude = True
+            ReturnTableOnly = False
+            AllowOpen = True
+            ReadOnlyy = False
+            RunLocal = False
+            Expanded = False
+            ShowExpand = True
+            SharedMe = Me
+        End Sub
+
+        ''' <summary>
+        ''' This is a callback that is called after the report if produced.  The report is a document of type Word, Excel, Email or RTF
+        ''' This depends on the type of report produced
+        ''' </summary>
+        ''' <param name="ReportObj">The Report object</param>
+        ''' <remarks></remarks>
+        Public Sub AfterReportProduce(ByVal ReportObj As Object) Implements defReport_Definitions.defReportDefinitionBase.AfterReportProduce
+        End Sub
+
+        ''' <summary>
+        ''' The callback is called after the file has been saved to kWatch.  The file object is a referances to the filFile object that has 
+        ''' just been saved
+        ''' </summary>
+        ''' <param name="File">The newly saved file</param>
+        ''' <remarks></remarks>
+        Public Sub AfterFileSave(ByVal File As kWatchServer.filFile) Implements defReport_Definitions.defReportDefinitionBase.AfterFileSave
+        End Sub
+
+
+        ''' <summary>
+        ''' This is the web request object that has been passed back from the originating call. This contains
+        ''' information relating to the browser, the call been made and the IIS server that the call came from.
+        ''' This is a copy of the request object that is generated by the server 
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Property Request As UserRequest Implements WebForm.Request
+
+        ''' <summary>
+        ''' This is the WebSite that this request belongs to
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Property Web As webWebSite Implements WebForm.Web
+
+        ''' <summary>
+        ''' This is the webContact that relatest to this request
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Property WebContact As webContactLogin Implements WebForm.WebContact
+
+#Region "Settings"
+
+        ''' <summary>
+        ''' This will return the settings object as a dynamic expando object that you can review and edit.  If you
+        ''' want your settings object casted to a specific type, use the GetSettings function.  Setting an object
+        ''' to this location will also update the settings object for you as well
+        ''' 
+        ''' This will get the settings object for this report object.  Settings objects are unique based on
+        ''' the RunReportID, LoggedInContact (either web or local), The active WebID or web site, a DashboardwidgetID and
+        ''' optionaly a SettingsLocationID that you might choose to use.
+        ''' 
+        ''' So for a kWatch report delivered within kWatch - this would be unique based on RunReportID and contactID only as
+        ''' webID, DashboardwidgetID and SettinglocationID are all nothing
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Property Settings As Object Implements WebForm.Settings
+            Get
+                Return WebManagement.SettingsManagement.GetSettings(Me) ' Newtonsoft.Json.JsonConvert.DeserializeObject(Of ExpandoObject)(Me.SettingsRecord.SettingsObject)
+            End Get
+            Set(value As Object)
+                WebManagement.SettingsManagement.SaveSettings(value, Me)
+            End Set
+        End Property
+
+        ''' <summary>
+        ''' This will return the settings object as a dynamic expando object that you can review and edit.  If you
+        ''' want your settings object casted to a specific type, use the GetSettings function.  Setting an object
+        ''' to this location will also update the settings object for you as well
+        ''' 
+        ''' This will get the settings object for this report object.  Settings objects are unique based on
+        ''' the RunReportID, LoggedInContact (either web or local), The active WebID or web site, a DashboardwidgetID and
+        ''' optionaly a SettingsLocationID that you might choose to use.
+        ''' 
+        ''' So for a kWatch report delivered within kWatch - this would be unique based on RunReportID and contactID only as
+        ''' webID, DashboardwidgetID and SettinglocationID are all nothing
+        ''' </summary>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Function GetSettings(Of SettingObjectType)() As SettingObjectType Implements WebForm.GetSettings
+
+            Return WebManagement.SettingsManagement.GetSettings(Of SettingObjectType)(Me)
+
+        End Function
+
+        ''' <summary>
+        ''' This will save the settings object to the database
+        ''' </summary>
+        ''' <typeparam name="SettingObjectType"></typeparam>
+        ''' <param name="Obj"></param>
+        ''' <remarks></remarks>
+        Public Sub SaveSettings(Of SettingObjectType)(Obj As SettingObjectType) Implements WebForm.SaveSettings
+
+            WebManagement.SettingsManagement.SaveSettings(Obj, Me)
+
+        End Sub
+
+        ''' <summary>
+        ''' This is a global property that if set - will be used as a reportProperties object by the dash-board component
+        ''' You do not need to set this - and it is set if this report is used as 
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        <kWHTML.kWForms.reportProperty>
+        Public Property DashboardWidgetID As Integer? Implements WebForm.DashboardWidgetID
+        ''' <summary>
+        ''' This will get the settings record for this report object.  Settings objects are created and unique based on
+        ''' the RunReportID, LoggedInContact (either web or local), The active WebID or web site, a dash-board Widget ID and
+        ''' optionaly a SettingsLocationID that you might choose to use.
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public ReadOnly Property SettingsRecord As defReportSetting Implements WebForm.SettingsRecord
+            Get
+                Return WebManagement.SettingsManagement.GetSettingsRecord(Me)
+            End Get
+        End Property
+
+
+        ''' <summary>
+        ''' This will return the guid that is used within the report object
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public ReadOnly Property ReportPropertiesGuid As Guid Implements WebForm.ReportPropertiesGuid
+            Get
+                Return WebManagement.SettingsManagement.getReportPropertiesGuid(Me)
+            End Get
+        End Property
+
+        ''' <summary>
+        ''' This wil return the report properties object for this report
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public ReadOnly Property ReportProperties As Object Implements WebForm.ReportProperties
+            Get
+                Return WebManagement.SettingsManagement.GetReportProperties(Me)
+            End Get
+        End Property
+
+        Public Function Expand()
+            ''Dim It
+            ''For Each It In AllErrors.All
+            ''    If LCase(It.ClassName) = LCase("HIGHLIGHT") Then
+            ''        If Expanded Then
+            ''            It.ROWDISPLAY = "no"
+            ''        Else
+            ''            It.ROWDISPLAY = "yes"
+            ''        End If
+            ''    End If
+            ''Next
+            ''Return Not Expanded
+
+        End Function
+
+
+        Public Function AddTaskErrors()
+            '            Dim AddForm
+            '            Dim Doc
+            '            Dim Its
+
+            '            If TypeName(BrowserControl.Item) = "tskTask" Then
+            '                Dim Its = BrowserControl.Item.ClassObject.TaskErrors
+            '            Else
+            '                Dim Its = BrowserControl.Item.ClassObject
+            '            End If
+
+            '            With Its.Reports_Definitions.Item_By_Name("LOCALHTMLADD_kWItems").ClassObject
+            '                .CodeObject.ItemReferance = "[ItemReferance]"
+            '                Dim AddForm = .Evaluate(False, False, "", True)
+            '                Dim AddForm.Document.ParentWindow.TaskForm = Document
+
+            'End With
+            '            'Evaluate(pasTest:=<<Boolean>>, ResetSystem:=True, Error_Message:=<<Variant>>, ShowReport:=True)
+
+            '            'Set Doc = AddForm.ShowModal(-1, "kWatch", True, 8000, 12000)
+            '            'ShowModal(Buttons:=vbOKOnly, Caption:="kWatch", NoTools:=True, Height:=2000, Width:=6000)
+
+            '            'Refresh the form
+            '            'TaskErrors.OuterHTML = Its.Reports_Definitions.Item_By_Name("LOCALHTML_kWItems").ClassObject.EvaluateAsText(True)
+
+
+        End Function
+
+#End Region
+
+
+
+
+#End Region
+    End Class
+
+    Public Class ClsErrorResolvedElse
+        Public Property Id As Integer
+        Public Property Descripencies
+        Public Property TotalErrors
+        Public Property TotalStatus
+        Public Property totalResolved
+        Public Property TotalUnResolved
+
+    End Class
+    Public Class ClsTaskMainTable
+        Public Property ID As Integer
+        Public Property RetailerName
+        Public Property Accountnumber
+        Public Property Billnumber
+        Public Property ActSdate
+        Public Property amount
+        Public Property Totalstatus
+        Public Property TotalResolved
+        Public Property TotalUnResolved
+        Public Property TempraryError
+        Public Property ErrorItProp
+    End Class
+    Public Class clsSubTableErrorResolved
+        Public Property Id As Integer
+        Public Property Description
+        Public Property Errortype
+        Public Property errorCalcBasis
+        Public Property Erroramount
+        Public Property Resolved
+        Public Property ResolutionAmount
+        Public Property ErrorItTemp
+    End Class
+End Namespace

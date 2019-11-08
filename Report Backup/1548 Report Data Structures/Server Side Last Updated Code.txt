@@ -1,0 +1,703 @@
+Imports kWHTML.Elements
+Imports WebManagement
+Imports kWHTML.kWForms
+Imports kWHTML
+Imports System.Text
+
+Namespace kWatchServer.datData_Structures
+    ''' <summary>"
+    ''' Define all custom code for this assembly within this class 
+    ''' </summary>
+    ''' <remarks></remarks>
+    Public Class WEBHTMLADD_kWItems
+        Implements WebForm
+
+#Region "Variables"
+        Private metUnitWh As Integer
+        Private metUnitVarh As Integer
+#End Region
+#Region "Form(Page) & Load Methods"
+        ''' <summary>
+        ''' Main function that is returned to the lines of the report when it is ran
+        ''' </summary>
+        ''' <param name="html"></param>
+        ''' <remarks></remarks>
+        Public Sub GetReport(html As HTMLTextWriterkWatch) Implements WebForm.GetReport
+            Dim repBase = GetReportBase()
+            repBase.ToString(html)
+        End Sub
+        Public Function GetReportBase() As HTMLkWFormBase Implements WebForm.GetReportBase
+            Dim Form = HTMLkWFormBase.Create(Me)
+            Form.onLoadFormBase = "onLoadFormBase1548"  'make sure this matches the onLoadFormBase name
+            Form.JScript.Add(My.Resources.ClientScript)
+            Form.FormHeader.FormName = "Add Data Structure"
+            If ItemReferenceObject() Is Nothing Then
+                Form.FormSectionMain.Add(New HTMLText("Data Structure Cannot Be Added From This Location"))
+                Return Form
+            End If
+            GetAllControlsDataStructure(Form)
+            Form.ScriptFunctionCallCodeObjectAdd(Function(c) c.AddItem(Nothing))
+            Form.ScriptFunctionCallCodeObjectAdd(Function(c) c.GetControlValue(String.Empty))
+            Return Form
+        End Function
+        ''' <summary>
+        ''' This is the function that is called when you need to refresh the form base object
+        ''' </summary>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Function RefreshFormBase() As String Implements WebForm.RefreshFormBase
+            'Get the report
+            Dim repBase As HTMLkWFormBase(Of WEBHTMLADD_kWItems) = GetReportBase()
+            'This will exclude the jscript code and other items
+            repBase.RefreshPageCall = True
+            Dim html As New HTMLTextWriterkWatch
+            repBase.ToString(html)
+            Return html.ToString
+
+        End Function
+#End Region
+#Region "All Controls Add"
+        Public Sub GetAllControlsDataStructure(form As HTMLkWFormBase(Of WEBHTMLADD_kWItems))
+            'Description
+            Dim Description = kWHTMLElementInputText.CreateDirect(Me, "Description", Nothing)
+            Description.LabelString = "Description"
+            Description.ClassName = "form-control"
+            form.FormSectionMain.Add(Description)
+            'SiteComapny
+            Dim SitenCompany = KWSelectItem.CreateDirect(Me, {utlClassType.utlClassTypeCompany, utlClassType.utlClassTypesitSite}, "SourceID", Me.SetUpObject.ClassObject.Source_IDS)
+            SitenCompany.LabelString = "Site/Company"
+            form.FormSectionMain.Add(SitenCompany)
+            'structure use
+            Dim DataStructure = kWHTMLElementInputSelect.CreateDirect(Me, 0, "StructureUse", StructureUse)
+            DataStructure.ValueAddIfNotInOptions = False
+            DataStructure.LabelString = "Structure Use"
+            DataStructure.onAfterUpdateEvent.onAfterTriggerFunctionName = "RefreshStructureUse"
+            form.FormSectionMain.Add(DataStructure)
+            'Import type
+            Dim ImpType = New HTMLElementDIV
+            ImpType.ID = "ImpType"
+            ImpType.Controls.Add(GetImportType("0"))
+            form.FormSectionMain.Add("Import Type", ImpType)
+            'OwnerComapny
+            Dim Datasource = KWSelectItem.CreateDirect(Me, {utlClassType.utlClassTypeCompany, utlClassType.utlClassTypesitSite}, "OwnerItemID", Nothing)
+            Datasource.LabelString = "Data Source"
+            form.FormSectionMain.Add(Datasource)
+            'Interval
+            Dim NewDataStructureInterval = kWHTMLElementInputNumber.CreateDirect(Me, "NewDataStructureInterval", "15", Nothing)
+            NewDataStructureInterval.DecimalPlaces = 0
+            NewDataStructureInterval.ClassName = "form-control"
+            NewDataStructureInterval.LabelString = "Interval(Only Values 5 ,15, 30 Allowed)"
+            form.FormSectionMain.Add(NewDataStructureInterval)
+            'Add Default Fields
+            Dim AddDefaultFields = kWHTMLElementInputCheckBox.CreateDirect(Me, True, "AddDefaultFields")
+            AddDefaultFields.LabelString = "Add Default Fields"
+            form.FormSectionMain.Add(AddDefaultFields)
+            'Mark as Export
+            Dim MarkAsExport = kWHTMLElementInputCheckBox.CreateDirect(Me, True, "AddAsImport")
+            MarkAsExport.LabelString = "Mark As Export"
+            form.FormSectionMain.Add(MarkAsExport)
+            'TemplateDescription
+            Dim TemplateDescription As New HTMLElementDIV
+            TemplateDescription.Controls.Add(New HTMLElementDIV("Export Means Imported To The Site Or Exported From The Electricity Grid"))
+            form.FormSectionMain.Add(TemplateDescription)
+            'Add Data Structure
+            Dim AddDataStructure = kWHTMLElementButton.Create(Me, "Add Data Structure")
+            AddDataStructure.onClickEvent.onBeforeTriggerFunctionName = "BeforeAddClick"
+            AddDataStructure.onClickEvent.eventDelegate = Function(c) c.AddItem(Nothing)
+            AddDataStructure.onClickEvent.onAfterTriggerFunctionName = "AfterAddClick"
+            AddDataStructure.ClassName = "btn btn-primary btn-md"
+            form.FormSectionMain.Add(AddDataStructure)
+            'Open Item
+            Dim ChkOpenItemCheckbox = kWHTMLElementInputCheckBox.CreateDirect(Me, False, "OpenItem")
+            ChkOpenItemCheckbox.LabelString = "Open Item"
+            ChkOpenItemCheckbox.placeholder = String.Empty
+            form.FormSectionMain.Add(ChkOpenItemCheckbox)
+            form.ScriptFunctionCallCodeObjectAdd(Function(c) c.BrowserType(Nothing))
+        End Sub
+#End Region
+#Region "Calculate Data"
+        Public Function BrowserType(BrowserControl As Object) As kWControlEventReturnInfo
+            If BrowserControl Is Nothing Then
+                Return New kWControlEventReturnInfo With {.success = True, .returnMessage = 0} '"NONE"}
+            ElseIf TypeName(BrowserControl).ToLower = "kWHTML_Add".ToLower Then
+                Return New kWControlEventReturnInfo With {.success = True, .returnMessage = 3} ' "UPPERWINDOW"}
+            ElseIf TypeName(BrowserControl).ToLower = "kwBrowser".ToLower Then
+                Return New kWControlEventReturnInfo With {.success = True, .returnMessage = 2} ' "NEWWINDOW"}
+            End If
+        End Function
+        Public Function AddItem(info As kWControlEventInfo) As kWControlEventReturnInfo
+            Try
+                Dim SourceObject1 As sitSite
+                If InStr(Me.SetUpObject.ClassObject.Source_IDs, ",") = 0 And Len(Me.SetUpObject.ClassObject.Source_IDs) > 0 Then
+                    SourceObject1 = Me.User.Get_Item_Object(Me.SetUpObject.ClassObject.Source_IDs).ClassObject
+                Else
+                    SourceObject1 = Nothing
+                End If
+                Dim TimeZone As Integer = CType(SourceObject1.ClassObject.TimeZone, Integer)
+                Dim Description As String = info.userObject.Description
+                Dim Site As String = info.userObject.Site
+                Dim Datainterval As Integer = info.userObject.Interval
+                Dim InputStructure As String = info.userObject.StructureUse
+                Dim ImportType As String = info.userObject.ImpotType
+                Dim DataSource As String = info.userObject.DataSource
+                Dim DefaultFields As Boolean = info.userObject.DefaultFields
+                Dim MarkAsExport As Boolean = info.userObject.MarkAsExport
+                Dim errmessage As StringBuilder = CheckValidation(Description, Datainterval)
+                If Not String.IsNullOrEmpty(errmessage.ToString) Then
+                    Return New kWControlEventReturnInfo With {.success = False, .returnMessage = errmessage.ToString}
+                End If
+                Dim DataStructureAdd As datData_StructureSetUp = Me.User.Banks(CStr(utlClassType.utlClassTypedatData_Structure_Bank)).SetUpObject
+                Dim DataStructure = DataStructureAdd.Add(CStr(Site), CStr(Description)).ClassObject
+                DataStructure.Note = "Linked Data structure created by " & Me.User.Contact.Name & " on the " & Now()
+                DataStructure.Interval = Datainterval
+                DataStructure.TimeZone = TimeZone
+                DataStructure.EstimateProfile = False
+                DataStructure.StructureUse = InputStructure
+                DataStructure.ImportType = ImportType
+                Dim DSTtUnitWh As datField = DataStructure.Fields.Add(DataStructure.ID, kWMeterEDMI.metMeasurmentUnit.metUnitWh).ClassObject
+                Dim DSTUnitVarh As datField = DataStructure.Fields.Add(DataStructure.ID, kWMeterEDMI.metMeasurmentUnit.metUnitVarh).ClassObject
+                DSTtUnitWh.Description = "Data"
+                DSTUnitVarh.Description = "Data"
+                Dim ReportInfo As Object = New Dynamic.ExpandoObject
+                ReportInfo.targetReportGuid = CType(DataStructure.Reports_Definitions.Item_By_Name("LOCALHTML_" & TypeName(DataStructure)).ClassObject, defRun_Report_Definition).RunReportGUID ' "43567d47-b760-4c5a-b527-b9b702540a19"
+                ReportInfo.targetReportPropertiesGuid = Nothing '"{}"
+                Return New kWControlEventReturnInfo With {.success = True, .returnData = ReportInfo, .returnMessage = "Data Structure Has Been Added Successfully"}
+            Catch ex As Exception
+                Return New kWControlEventReturnInfo With {.success = False, .returnMessage = ex.ToString} ' ex.Message}
+            End Try
+        End Function
+#End Region
+#Region "Use Datastructure Lists"
+        Public Function StructureUse() As List(Of kWHTMLElementInputSelect.SelectOption)
+            Dim options As New List(Of kWHTMLElementInputSelect.SelectOption)
+            options.Add(New kWHTMLElementInputSelect.SelectOption With {.id = "0", .text = "General Use"})
+            options.Add(New kWHTMLElementInputSelect.SelectOption With {.id = "3", .text = "Market Data"})
+            Return options
+        End Function
+        Public Function GetImportType(imptype As String) As HTMLElementDIV
+            Dim DivGetImportype = New HTMLElementDIV()
+            Dim options As New List(Of kWHTMLElementInputSelect.SelectOption)
+            If imptype.Equals("3") Then
+                options.Add(New kWHTMLElementInputSelect.SelectOption With {.id = "1", .text = "Distributor Data"})
+                options.Add(New kWHTMLElementInputSelect.SelectOption With {.id = "3", .text = "MDA/MDP data"})
+            ElseIf imptype.Equals("0") Then
+                options.Add(New kWHTMLElementInputSelect.SelectOption With {.id = "0", .text = "Other or Not Specified"})
+                options.Add(New kWHTMLElementInputSelect.SelectOption With {.id = "1", .text = "Distributor Data"})
+                options.Add(New kWHTMLElementInputSelect.SelectOption With {.id = "2", .text = "Retailer Data"})
+                options.Add(New kWHTMLElementInputSelect.SelectOption With {.id = "3", .text = "MDA/MDP data"})
+            End If
+            Dim ImportTypeSelectInputCell = kWHTMLElementInputSelect.CreateDirect(Me, 0, "ImportTypeSelectInputCell", options)
+            ImportTypeSelectInputCell.NothingInclude = False
+            ImportTypeSelectInputCell.ValueAddIfNotInOptions = False
+            ImportTypeSelectInputCell.LabelDisplay = False
+            DivGetImportype.Controls.Add(ImportTypeSelectInputCell)
+            Return DivGetImportype
+        End Function
+#End Region
+#Region "Validation Summary"
+        Function ValidateSpecialCharacters(stringname As String) As Boolean
+            Dim result As Boolean = False
+            result = stringname.IndexOfAny("[~`!@#$%^&*()-+=|{}':;.,<>/?]".ToCharArray) <> -1
+            Return result
+        End Function
+        Public Function CheckValidation(Description As String, Datainterval As Integer) As StringBuilder
+            Dim errMsg As New StringBuilder
+            Dim ReportNameResult As Boolean = ValidateSpecialCharacters(Description)
+            If Description.Length <= 0 Then
+                errMsg.AppendLine("Please Enter Description For The Data Structure</br>")
+            End If
+            Dim IntervalResult As Boolean = ValidateSpecialCharacters(Datainterval)
+            If ReportNameResult = True Then
+                errMsg.AppendLine("Special Characters Not Allowed In Data Interval</br>")
+            End If
+            If (Datainterval <> 15) And (Datainterval <> 30) And (Datainterval <> 5) Then
+                errMsg.AppendLine("Invalid Data Interval Values</br>")
+            End If
+            Return errMsg
+        End Function
+#End Region
+#Region "Default Code"
+        Public Function SourceObject()
+            If InStr(Me.SetUpObject.ClassObject.Source_IDs, ", ") = 0 And Len(Me.SetUpObject.ClassObject.Source_IDs) > 0 Then
+                Dim SourceObject1 = Me.User.Get_Item_Object(Me.SetUpObject.ClassObject.Source_IDs).ClassObject
+            Else
+                Dim SourceObject2 = Nothing
+            End If
+
+        End Function
+
+        Public Function SourceClassType()
+            If Not SourceObject() Is Nothing Then
+                SourceClassType = SourceObject.ClassType
+            Else
+                SourceClassType = 0
+            End If
+
+        End Function
+        Public Function GetAddProcedure()
+            'Use this procedure to get the add command procedure that is used to add items of this type to the SQL server
+            GetAddProcedure = Me.Bank.AddCommandString
+        End Function
+        'Public Function GetDataTypes()
+        '    Dim metAr
+        '    Dim RelDataTypes
+        '    Dim ResString
+        '    Dim Count1
+        '    Dim Count2
+        '    Dim Found
+
+        '    metAr = GetEnumArray("metMeasurmentUnit")
+
+        '    RelDataTypes = metMeasurementAssociatedUnits(SourceObject.DataType)
+
+        '    For Count1 = 0 To UBound(metAr, 2)
+        '        Found = False
+        '        For Count2 = 0 To UBound(RelDataTypes)
+        '            If RelDataTypes(Count2) = metAr(1, Count1) Then
+        '                Found = True
+        '                Exit For
+        '            End If
+        '        Next
+        '        If Found Then
+        '            If Len(ResString) > 0 Then
+        '                ResString = ResString & "|" & metAr(1, Count1) & ", " & metAr(0, Count1)
+        '            Else
+        '                ResString = metAr(1, Count1) & ", " & metAr(0, Count1)
+        '            End If
+        '        End If
+        '    Next
+
+        '    'Return the results here
+        '    GetDataTypes = ResString
+
+        'End Function
+
+        'Public Function metMeasurementAssociatedUnits(SourcemetMeasurementUnit)
+        '    '  This will simply return units that can be convereted between - ie - you cant directly convert from kV to kW - but you can convert from
+        '    '     watts to MW as they are the same base unit
+        '    Dim Res ' As Double
+
+
+        '    Select Case SourcemetMeasurementUnit
+
+        '        Case metMeasurmentUnit1.metUnitWh, metMeasurmentUnit.metUnitWatts, metMeasurmentUnit.metUnitkWh,
+        '    metMeasurmentUnit.metUnitkW,
+        '    metMeasurmentUnit.metUnitMWh,
+        '    metMeasurmentUnit.metUnitMW,
+        '    metMeasurmentUnit.metUnitGWh,
+        '    metMeasurmentUnit.metUnitGW
+
+        '            metMeasurementAssociatedUnits = Array(metMeasurmentUnit.metUnitWh,
+        '                    metMeasurmentUnit.metUnitWatts,
+        '                    metMeasurmentUnit.metUnitkWh,
+        '                    metMeasurmentUnit.metUnitkW,
+        '                    metMeasurmentUnit.metUnitMWh,
+        '                    metMeasurmentUnit.metUnitMW,
+        '                    metMeasurmentUnit.metUnitGWh,
+        '                    metMeasurmentUnit.metUnitGW)
+
+        '        Case metMeasurmentUnit.metUnitVAh,
+        '    metMeasurmentUnit.metUnitVA,
+        '    metMeasurmentUnit.metUnitkVAh,
+        '    metMeasurmentUnit.metUnitkVA,
+        '    metMeasurmentUnit.metUnitMVAh,
+        '    metMeasurmentUnit.metUnitMVA
+
+        '            metMeasurementAssociatedUnits = Array(metMeasurmentUnit.metUnitVAh,
+        '            metMeasurmentUnit.metUnitVA,
+        '            metMeasurmentUnit.metUnitkVAh,
+        '            metMeasurmentUnit.metUnitkVA,
+        '            metMeasurmentUnit.metUnitMVAh,
+        '            metMeasurmentUnit.metUnitMVA)
+
+
+        '        Case metMeasurmentUnit.metUnitkVArh,
+        '    metMeasurmentUnit.metUnitkVAr,
+        '    metMeasurmentUnit.metUnitVARs,
+        '    metMeasurmentUnit.metUnitVarh,
+        '    metMeasurmentUnit.metUnitMVArh,
+        '    metMeasurmentUnit.metUnitMVAr
+
+        '            metMeasurementAssociatedUnits = Array(metMeasurmentUnit.metUnitkVArh,
+        '                metMeasurmentUnit.metUnitkVAr,
+        '                metMeasurmentUnit.metUnitVARs,
+        '                metMeasurmentUnit.metUnitVarh,
+        '                metMeasurmentUnit.metUnitMVArh,
+        '                metMeasurmentUnit.metUnitMVAr)
+
+        '        Case metMeasurmentUnit.metdollMWh,
+        '    metMeasurmentUnit.metckWh
+
+        '            metMeasurementAssociatedUnits = Array(metMeasurmentUnit.metdollMWh,
+        '            metMeasurmentUnit.metckWh)
+
+        '        Case Else
+        '            metMeasurementAssociatedUnits = Array(metMeasurementAssociatedUnits)
+        '    End Select
+
+
+        'End Function
+
+        Public Function CreateLinkedDataStructure(Description, DataType, LinkedSDate, LinkedEDate, Interval, TimeZone, IntervalTimeRepresents)
+            Dim DataStructure
+            Dim DSTField
+            Dim Source_ID
+            Source_ID = SourceObject.LongID
+            If Len(Description) = 0 Then
+                Description = "Imported Data From MDA"
+            End If
+            DataStructure = Me.User.Banks("195").Add(CStr(Source_ID), CStr(Description)).ClassObject
+            '@Source_ID VarChar(50), @Description VarChar(1000)
+            DataStructure.Note = "Linked Data Structure created by " & Me.User.Contact.Name & " On the " & Now()
+            DataStructure.Interval = Interval   '30 min interval structure
+            DataStructure.TimeZone = TimeZone
+            DataStructure.EstimateProfile = False
+            DSTField = DataStructure.Fields.Add(DataStructure.ID, CLng(DataType)).ClassObject
+            DSTField.Description = "Data"
+            DSTField.IntervalTimeRepresents = IntervalTimeRepresents
+            '@Data_Structure_ID int, @DataType int	6=Wh	3=Watts
+            DataStructure.LinkedStreamSDate = LinkedSDate
+            DataStructure.LinkedStreamEDate = LinkedEDate
+            DataStructure.LinkedStreamUpdate = True
+            'Now load the new data structure with data
+            'SourceObject.DataUpdated
+            Return DataStructure.LongID
+        End Function
+        Public Function CreateDataStructure(SourceID, Description, Interval, AddFields, AddasExport, StructureUse, ImportType, OwnerItemID)
+            'This will create a standard data structure
+            Dim DataStructure
+            Dim DSTField
+            Dim postfix
+            If AddasExport Then
+                postfix = " Export"
+            Else
+                postfix = " Import"
+            End If
+            If Len(Description) = 0 Then
+                Description = postfix & " data from MDA"
+            End If
+            DataStructure = Me.User.Banks("195").Add(CStr(SourceID), CStr(Description)).ClassObject
+            '@Source_ID VarChar(50), @Description VarChar(1000)
+            DataStructure.Note = "Data Structure created by " & Me.User.Contact.Name & " On the " & Now()
+            DataStructure.Interval = Interval   '30 min interval structure
+            DataStructure.EstimateProfile = False
+            DataStructure.ImportType = ImportType
+            DataStructure.StructureUse = StructureUse
+            DataStructure.OwnerItemID = OwnerItemID
+            If AddFields Then
+                DSTField = DataStructure.Fields.Add(DataStructure.ID, metUnitWh).ClassObject
+                DSTField.Description = "Wh" & LCase(postfix)
+                '@Data_Structure_ID int, @DataType int	6=Wh	3=Watts
+                DSTField = DataStructure.Fields.Add(DataStructure.ID, metUnitVarh).ClassObject
+                DSTField.Description = "VARh" & LCase(postfix)
+                '@Data_Structure_ID int, @DataType int	6=Wh	3=Watts
+            End If
+            Return DataStructure.LongID
+        End Function
+        Public Function RefreshImportTypeSelection(StructureUse)
+            Dim selectionlist
+            If StructureUse = 3 Then '3 = market, 0 = general, 1 = linked data streams, 2 = projected data
+                selectionlist = "1, Distributer Data|3, Mda / MDP Data"
+            Else
+                selectionlist = "0, Other Or Not Specified|1, Distributer Data|2, Retailer Data|3, Mda / MDP Data"
+            End If
+            Dim SelLst
+            With Me.User.Reports_Definitions.Item_By_Name("HTML_Select").ClassObject
+                With .CodeObject
+                    .SetDefaults
+                    .ID = "ImportType"
+                    .Width = "200px"
+                    .Value = StructureUse
+                    .Editable = True
+                    .ShowEditButton = False
+                    .OnChange = "vbscript: refreshOwnerItemIDSelection"
+                    .List = selectionlist
+                    '.EnumType = "pymBank_TransactionType"
+                End With
+                SelLst = .EvaluateAsText(False)
+            End With
+            Return SelLst
+        End Function
+        Public Function RefreshOwnerItemIDSelection(importtype, source)
+            Dim initvalue
+            Dim initname
+            Dim initicon
+            Dim sourceref
+            initvalue = ""
+            initname = ""
+            initicon = ""
+            ' importtype = 1
+            ' source =  me.SetUpObject.ClassObject.Source_IDs
+            sourceref = Me.User.Get_Item_Object(source).ClassObject
+            If sourceref.classtype = utlClassType.utlClassTypesitSite Then
+                '"0,Other or Not Specified|1,Distributer Data|2,Retailer Data|3,MDA/MDP Data"
+                Select Case importtype
+                    Case 1
+                        If sourceref.NetworkPricing_Series.GetEntries(Now).count > 0 Then
+                            initvalue = sourceref.NetworkPricing_Series.GetEntries(Now)(1).ItemReferance.owneritem.longid
+                            initname = sourceref.NetworkPricing_Series.GetEntries(Now)(1).ItemReferance.owneritem.name
+                            initicon = sourceref.NetworkPricing_Series.GetEntries(Now)(1).ItemReferance.owneritem.icon
+                        End If
+                    Case 2
+                        If Not sourceref.CurrentPricing Is Nothing Then
+                            initvalue = sourceref.CurrentPricing.retailer.longid
+                            initname = sourceref.CurrentPricing.retailer.name
+                            initicon = sourceref.CurrentPricing.retailer.icon
+                        End If
+                    Case 3
+                        If sourceref.DefaultPricing_Series.GetEntries(Now).count > 0 Then
+                            initvalue = sourceref.DefaultPricing_Series.GetEntries(Now)(1).ItemReferance.owneritem.longid
+                            initname = sourceref.DefaultPricing_Series.GetEntries(Now)(1).ItemReferance.owneritem.name
+                            initicon = sourceref.DefaultPricing_Series.GetEntries(Now)(1).ItemReferance.owneritem.icon
+                        End If
+                End Select
+            End If
+            Dim temp
+            temp = initvalue & "'" & "4" & "'" & " InitialName=" & "'" & initname & "'" & "  InitialIcon=" & "'" & initicon
+            RefreshOwnerItemIDSelection = temp
+        End Function
+        Public Function GetControlValue(ControlValue As String) As kWControlEventReturnInfo
+            Return New kWControlEventReturnInfo With {.success = True, .returnData = GetImportType(ControlValue).ToString}
+            Return Nothing
+        End Function
+        Public Function getObject() As Object
+
+            If Len(Me.SetUpObject.ClassObject.Issued_To_Ids) > 0 Then
+                'Dim LongID = Me.SetUpObject.ClassObject.ItemReferanceIDs
+                Dim LongID = Me.SetUpObject.ClassObject.Issued_To_Ids
+                Return Me.User.Get_Item_Object(LongID).ClassObject
+            End If
+            Return Nothing
+        End Function
+        Public Function GetSiteName()
+            Dim InitName
+            Dim InitIcon
+            Dim SourceIDs
+            InitName = ""
+            InitIcon = ""
+            SourceIDs = ""
+            If Len(Me.SetUpObject.ClassObject.Source_IDs) > 0 Then
+                If InStr(1, Me.SetUpObject.ClassObject.Source_IDs, ",") = 0 Then
+                    With Me.User.Get_Item_Object(Me.SetUpObject.ClassObject.Source_IDs, True).ClassObject
+                        InitName = .Name
+                        InitIcon = .Icon
+                        SourceIDs = .LongID
+                    End With
+                End If
+            End If
+            Return SourceIDs
+        End Function
+        <ThreadStatic()>
+        Public Shared SharedMe As WEBHTMLADD_kWItems
+
+        'Private _Entities As Entities
+        '''' <summary>
+        '''' This should only be used when updating properties, not in any other code - when you need the entities you should
+        '''' create it yourself
+        '''' </summary>
+        '''' <value></value>
+        '''' <returns></returns>
+        '''' <remarks></remarks>
+        'Public ReadOnly Property Entities As Entities
+        '    Get
+        '        If Not _Entities Is Nothing Then
+        '            If _Entities.IsDisposed Then
+        '                _Entities = Nothing
+        '            End If
+        '        End If
+        '        If _Entities Is Nothing Then
+        '            _Entities = New Entities(Me.User)
+        '        End If
+
+        '        Return _Entities
+        '    End Get
+        'End Property
+
+        ''' <summary>
+        ''' This can be used to associate an icon with this report that is different to the underlying report
+        ''' You could set this within the SetDefaults, or you could create a get and set componet of the 
+        ''' property and override it
+        ''' </summary>
+        ''' <returns></returns>
+        Public Property ReportIcon As Icons Implements WebForm.ReportIcon
+        Public Function ItemReferenceObject() As kWItem
+            '***************************THIS CODE Is Not WORKING HERE'***********************
+            'If Len(Me.SetUpObject.ClassObject.ItemReferanceIDs) > 0 Then
+
+            '    Dim LongID = Me.SetUpObject.ClassObject.ItemReferanceIDs
+            '    Return Me.User.Get_Item_Object(LongID).ClassObject
+            'End If
+            'Return Nothing
+            '**********************************************************************************
+            If Len(Me.User.Company.LongID) > 0 Then
+                Dim LongID = Me.User.Company.LongID
+                Return Me.User.Get_Item_Object(LongID).ClassObject
+            End If
+            Return Nothing
+        End Function
+
+        ''' <summary>
+        ''' Initialization code in here for this report.  This code will be called each time the report is ran
+        ''' other call reports should also call this before using the report output or any contained functions
+        ''' </summary>
+        ''' <remarks></remarks>
+        Public Sub SetDefaults() Implements defReport_Definitions.defReportDefinitionBase.SetDefaults
+            'Uncomment these lines if you have an entitites object
+            'If Not _Entities Is Nothing Then
+            '    _Entities.Dispose()
+            '    _Entities = Nothing
+            'End If
+
+            SharedMe = Me
+        End Sub
+
+        ''' <summary>
+        ''' This is a callback that is called after the report if produced.  The report is a document of type Word, Excel, Email or RTF
+        ''' This depends on the type of report produced
+        ''' </summary>
+        ''' <param name="ReportObj">The Report object</param>
+        ''' <remarks></remarks>
+        Public Sub AfterReportProduce(ByVal ReportObj As Object) Implements defReport_Definitions.defReportDefinitionBase.AfterReportProduce
+        End Sub
+
+        ''' <summary>
+        ''' The callback is called after the file has been saved to kWatch.  The file object is a referances to the filFile object that has 
+        ''' just been saved
+        ''' </summary>
+        ''' <param name="File">The newly saved file</param>
+        ''' <remarks></remarks>
+        Public Sub AfterFileSave(ByVal File As kWatchServer.filFile) Implements defReport_Definitions.defReportDefinitionBase.AfterFileSave
+        End Sub
+        ''' <summary>
+        ''' This is the web request object that has been passed back from the originating call. This contains
+        ''' information relating to the browser, the call been made and the IIS server that the call came from.
+        ''' This is a copy of the request object that is generated by the server 
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Property Request As UserRequest Implements WebForm.Request
+        ''' <summary>
+        ''' This is the WebSite that this request belongs to
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Property Web As webWebSite Implements WebForm.Web
+        ''' <summary>
+        ''' This is the webContact that relatest to this request
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Property WebContact As webContactLogin Implements WebForm.WebContact
+
+#Region "Settings"
+
+        ''' <summary>
+        ''' This will return the settings object as a dynamic expando object that you can review and edit.  If you
+        ''' want your settings object casted to a specific type, use the GetSettings function.  Setting an object
+        ''' to this location will also update the settings object for you as well
+        ''' 
+        ''' This will get the settings object for this report object.  Settings objects are unique based on
+        ''' the RunReportID, LoggedInContact (either web or local), The active WebID or web site, a DashboardwidgetID and
+        ''' optionaly a SettingsLocationID that you might choose to use.
+        ''' 
+        ''' So for a kWatch report delivered within kWatch - this would be unique based on RunReportID and contactID only as
+        ''' webID, DashboardwidgetID and SettinglocationID are all nothing
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Property Settings As Object Implements WebForm.Settings
+            Get
+                Return WebManagement.SettingsManagement.GetSettings(Me) ' Newtonsoft.Json.JsonConvert.DeserializeObject(Of ExpandoObject)(Me.SettingsRecord.SettingsObject)
+            End Get
+            Set(value As Object)
+                WebManagement.SettingsManagement.SaveSettings(value, Me)
+            End Set
+        End Property
+
+        ''' <summary>
+        ''' This will return the settings object as a dynamic expando object that you can review and edit.  If you
+        ''' want your settings object casted to a specific type, use the GetSettings function.  Setting an object
+        ''' to this location will also update the settings object for you as well
+        ''' 
+        ''' This will get the settings object for this report object.  Settings objects are unique based on
+        ''' the RunReportID, LoggedInContact (either web or local), The active WebID or web site, a DashboardwidgetID and
+        ''' optionaly a SettingsLocationID that you might choose to use.
+        ''' 
+        ''' So for a kWatch report delivered within kWatch - this would be unique based on RunReportID and contactID only as
+        ''' webID, DashboardwidgetID and SettinglocationID are all nothing
+        ''' </summary>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Function GetSettings(Of SettingObjectType)() As SettingObjectType Implements WebForm.GetSettings
+
+            Return WebManagement.SettingsManagement.GetSettings(Of SettingObjectType)(Me)
+
+        End Function
+
+        ''' <summary>
+        ''' This will save the settings object to the database
+        ''' </summary>
+        ''' <typeparam name="SettingObjectType"></typeparam>
+        ''' <param name="Obj"></param>
+        ''' <remarks></remarks>
+        Public Sub SaveSettings(Of SettingObjectType)(Obj As SettingObjectType) Implements WebForm.SaveSettings
+
+            WebManagement.SettingsManagement.SaveSettings(Obj, Me)
+
+        End Sub
+
+        ''' <summary>
+        ''' This is a global property that if set - will be used as a reportProperties object by the dash-board component
+        ''' You do not need to set this - and it is set if this report is used as 
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        <kWHTML.kWForms.reportProperty>
+        Public Property DashboardWidgetID As Integer? Implements WebForm.DashboardWidgetID
+        ''' <summary>
+        ''' This will get the settings record for this report object.  Settings objects are created and unique based on
+        ''' the RunReportID, LoggedInContact (either web or local), The active WebID or web site, a dash-board Widget ID and
+        ''' optionaly a SettingsLocationID that you might choose to use.
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public ReadOnly Property SettingsRecord As defReportSetting Implements WebForm.SettingsRecord
+            Get
+                Return WebManagement.SettingsManagement.GetSettingsRecord(Me)
+            End Get
+        End Property
+
+
+        ''' <summary>
+        ''' This will return the guid that is used within the report object
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public ReadOnly Property ReportPropertiesGuid As Guid Implements WebForm.ReportPropertiesGuid
+            Get
+                Return WebManagement.SettingsManagement.getReportPropertiesGuid(Me)
+            End Get
+        End Property
+
+        ''' <summary>
+        ''' This wil return the report properties object for this report
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public ReadOnly Property ReportProperties As Object Implements WebForm.ReportProperties
+            Get
+                Return WebManagement.SettingsManagement.GetReportProperties(Me)
+            End Get
+        End Property
+#End Region
+#End Region
+    End Class
+End Namespace

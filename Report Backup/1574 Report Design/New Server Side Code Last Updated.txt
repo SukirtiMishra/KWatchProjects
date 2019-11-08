@@ -1,0 +1,649 @@
+Imports kWHTML
+Imports kWHTML.Elements
+Imports WebManagement
+Imports kWHTML.kWForms
+Imports System.Text
+
+Namespace kWatchServer.repReportDesigns
+    ''' <summary>"
+    ''' Define all custom code for this assembly within this class 
+    ''' </summary>
+    ''' <remarks></remarks>
+    Public Class WEBHTMLADD_kWItems
+        Implements WebForm
+#Region "Public Variables & Properties"
+
+        Public Property PaymentAccounts
+        Public Property PaymentAccountsReferance_new As kWItems
+        Public Property CSSInclude As Boolean
+        Public Property IncludeHeading As Boolean
+        Public Property DefaultIsInvoice As Boolean
+        Public Property DefaultOpenItem As Boolean
+        Public Property DefaultReportSDate As String
+        Public Property DefaultReportEDate As String
+        Public Property DefaultDescription As String
+        Public Property DefaultReportDefinitionID As Integer
+        Public Property DefaultPaymentAccountID As Integer
+        Public Property DefaultItemReferanceID As Object
+        Public Property ShowItemReferanceID As Boolean
+        Public Property ShowAdd As Boolean
+        Public Property SupressAddConfirmation As Boolean
+#End Region
+#Region "Form(Page) & Load Methods"
+        ' ''' <summary>
+        ' ''' Example - This can be used as a report property - note the <reportProperty>  attribute that has been applied
+        ' ''' </summary>
+        ' ''' <value></value>
+        ' ''' <returns></returns>
+        ' ''' <remarks></remarks>
+        '<reportProperty>
+
+        ''' <summary>
+        ''' Main function that is returned to the lines of the report when it is ran
+        ''' </summary>
+        ''' <param name="html"></param>
+        ''' <remarks></remarks>
+        Public Sub GetReport(html As HTMLTextWriterkWatch) Implements WebForm.GetReport
+            Dim repBase = GetReportBase()
+            repBase.ToString(html)
+        End Sub
+        Public Function GetReportBase() As HTMLkWFormBase Implements WebForm.GetReportBase
+            Dim Form = HTMLkWFormBase.Create(Me)
+            Form.onLoadFormBase = "onLoadFormBase1574"  'make sure this matches the onLoadFormBase name
+            Form.JScript.Add(My.Resources.ClientScript)
+            Form.FormHeader.FormName = "Add Report Design"
+            GetAllControls(Form)
+            Form.ScriptFunctionCallCodeObjectAdd(Function(c) c.RefreshCreatedPaymentAccount(String.Empty, False))
+            Form.ScriptFunctionCallCodeObjectAdd(Function(c) c.AddItem(Nothing))
+            Form.ScriptFunctionCallCodeObjectAdd(Function(c) c.OpenpaymentAccountPage(String.Empty))
+            Return Form
+        End Function
+        ''' <summary>
+        ''' This is the function that is called when you need to refresh the form base object
+        ''' </summary>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Function RefreshFormBase() As String Implements WebForm.RefreshFormBase
+            'Get the report
+            Dim repBase As HTMLkWFormBase(Of WEBHTMLADD_kWItems) = GetReportBase()
+            repBase.RefreshPageCall = True
+            Dim html As New HTMLTextWriterkWatch
+            repBase.ToString(html)
+            Return html.ToString
+        End Function
+#End Region
+#Region "Get All Controls"
+        Public Sub GetAllControls(Form As HTMLkWFormBase(Of WEBHTMLADD_kWItems))
+            Dim Description = kWHTMLElementInputText.CreateDirect(Me, "Description", "")
+            Description.ID = "Description"
+            Form.FormSectionMain.Add(Description)
+
+            Dim LongID As String = ItemReferenceObject.LongID
+            Dim ItemReferance = KWSelectItem.CreateDirect(Me, {utlClassType.utlClassTypeCompany, utlClassType.utlClassTypesitSite}, "ItemReferance", LongID)
+            ItemReferance.LabelString = "Item Referance"
+            ItemReferance.onAfterUpdateEvent.onAfterTriggerFunctionName = "RefreshInvoiceSection"
+            Dim ReportRegularity = kWHTMLElementInputSelect.CreateDirect(Me, repReportRegularity.repReportRegularityMonthly, "RepReportRegularity", GetType(repReportRegularity))
+            ReportRegularity.LabelString = "Report Regularity"
+            ReportRegularity.NothingInclude = False
+
+            Dim ChkInvoice = kWHTMLElementInputCheckBox.CreateDirect(Me, False, "ChkInvoice")
+            ChkInvoice.Width = "80%"
+            ChkInvoice.Title = "Invoice"
+            ChkInvoice.LabelString = "Is Invoice"
+            ChkInvoice.onClickEvent.onAfterTriggerFunctionName = "RefreshInvoiceSection"
+
+            Dim ReportStartDate = kWHTMLElementInputCalendar.CreateDirect(Me, DateSerial(Year(Today), Month(Today), 1), "ReportStartDate")
+            ReportStartDate.DefaultToEndOfDay = False
+            ReportStartDate.LabelString = "Start Date"
+
+            Dim ReportEndDate = kWHTMLElementInputCalendar.CreateDirect(Me, Nothing, "ReportEndDate")
+            ReportEndDate.DefaultToEndOfDay = True
+            ReportEndDate.LabelString = "End Date"
+
+            Dim ReportNote = kWHTMLElementInputText.CreateDirect(Me, "ReportNote", "")
+            ReportNote.LabelString = "Note"
+
+            Dim ChkOpenItemCheckbox = kWHTMLElementInputCheckBox.CreateDirect(Me, False, "OpenItem")
+            ChkOpenItemCheckbox.LabelString = "Open Item"
+            ChkOpenItemCheckbox.placeholder = String.Empty
+
+            Dim AddReportDesign = kWHTMLElementButton.Create(Me, "Add Report Design")
+            AddReportDesign.onClickEvent.onBeforeTriggerFunctionName = "BeforeAddClick"
+            AddReportDesign.onClickEvent.eventDelegate = Function(c) c.AddItem(Nothing)
+            AddReportDesign.onClickEvent.onAfterTriggerFunctionName = "AfterAddClick"
+            AddReportDesign.ClassName = "btn btn-primary btn-md"
+            Form.FormSectionMain.Add(ItemReferance)
+            Form.FormSectionMain.Add(ReportRegularity)
+            Form.FormSectionMain.Add(ChkInvoice)
+            Dim InvoiceDIV = New HTMLElementDIV()
+            InvoiceDIV.ID = "InvoiceDIV"
+            InvoiceDIV.Controls.Add(OpenPaymentAccount(False, ItemReferenceObject.LongID))
+            Form.FormSectionMain.Add(InvoiceDIV)
+            InvoiceDIV.ClassName = InvoiceDIV.ClassName & " col-md-9 col-md-offset-3"
+            Form.FormSectionMain.Add(ReportStartDate)
+            Form.FormSectionMain.Add(ReportEndDate)
+            Form.FormSectionMain.Add(ReportNote)
+            Form.FormSectionMain.Add(ChkOpenItemCheckbox)
+            Form.FormSectionMain.Add(AddReportDesign)
+        End Sub
+#End Region
+#Region "Calculate Data"
+        Public Function ItemReferenceObject() As kWItem
+            If Len(Me.SetUpObject.ClassObject.ItemReferanceIDs) > 0 Then
+                Dim LongID = Me.SetUpObject.ClassObject.ItemReferanceIDs
+                Return Me.User.Get_Item_Object(LongID).ClassObject
+            End If
+            Return Nothing
+        End Function
+
+        Public Function RefreshCreatedPaymentAccount(LongID As String, IsInvoice As Boolean) As kWControlEventReturnInfo
+            Return New kWControlEventReturnInfo With {.success = True, .returnData = OpenPaymentAccount(IsInvoice, LongID).ToString}
+        End Function
+        Public Function OpenPaymentAccount(IsInvoice As Boolean, LongID As String) As HTMLElementDIV
+            Dim DivOpenpaymentAccount As New HTMLElementDIV()
+            Dim Obj As kWItem = User.Get_Item_Object(LongID).ClassObject
+            Dim CompanyObject As comCompany = Nothing
+            If Obj.ClassType = utlClassType.utlClassTypeCompany Then
+                CompanyObject = Obj
+            ElseIf Obj.ClassType = utlClassType.utlClassTypesitSite Then
+                CompanyObject = CType(Obj, sitSite).Company
+            End If
+            If (IsInvoice = True) Then
+                DivOpenpaymentAccount.Controls.Add(GetPaymentAccounts(CompanyObject))
+                Dim AddPaymentAccount = kWHTMLElementButton.Create(Me, "Add New Payment")
+                AddPaymentAccount.onClickEvent.onAfterTriggerFunctionName = "AddPaymentAccountScript"
+                DivOpenpaymentAccount.Controls.Add(AddPaymentAccount)
+            End If
+            DivOpenpaymentAccount.Controls.Add(GetReportTypes(IsInvoice))
+            Return DivOpenpaymentAccount
+        End Function
+        Public Function GetPaymentAccounts(CompanyObj As comCompany) As kWHTMLElementInputSelect(Of WEBHTMLADD_kWItems, Integer)
+            Dim PaymentAccountList As New List(Of kWHTMLElementInputSelect.SelectOption)
+            Dim firstSelectOption As New kWHTMLElementInputSelect.SelectOption
+            PaymentAccountList.Add(firstSelectOption)
+            If (CompanyObj IsNot Nothing) Then
+                For Each item As pymPayment_Account In CompanyObj.Payment_AccountsInvoices
+                    Dim SelOption As New kWHTMLElementInputSelect.SelectOption
+                    firstSelectOption.id = 0
+                    firstSelectOption.text = "Select Payment Account"
+                    SelOption.id = item.ID
+                    SelOption.text = item.Name
+                    PaymentAccountList.Add(SelOption)
+                Next
+            End If
+            Dim PaymentAccount = kWHTMLElementInputSelect.CreateDirect(Me, 0, "PaymentAccount", PaymentAccountList)
+            PaymentAccount.NothingInclude = False
+            PaymentAccount.ValueAddIfNotInOptions = False
+            PaymentAccount.SortOptions = False
+            PaymentAccount.LabelString = "Payment Account"
+            PaymentAccount.FontSize = FontSize.medium
+            PaymentAccount.NothingInclude = False
+            Return PaymentAccount
+        End Function
+        Public Function GetReportTypes(IsInvoice As Boolean) As kWHTMLElementInputSelect(Of WEBHTMLADD_kWItems, Integer)
+            Dim Items = New kWatchServer.kWItems
+            Dim SetUp = New kWatchServer.defReport_DefinitionSetUp
+            If IsInvoice Then
+                SetUp.Base_ClassTypes = utlClassType.utlClassTyperepReport 'repReport
+                SetUp.Categories = "Invoicing"
+            Else
+                SetUp.Base_ClassTypes = utlClassType.utlClassTyperepReport 'repReport
+                SetUp.Categories = "Reporting"
+
+                If ItemReferenceObject() IsNot Nothing Then
+                    If ItemReferenceObject.ClassType = utlClassType.utlClassTypeCompany Then
+                        SetUp.Categories = "Reporting Company"
+                    End If
+                End If
+            End If
+            Dim PaymentAccountList As New List(Of kWHTMLElementInputSelect.SelectOption)
+            Dim firstSelectOption As New kWHTMLElementInputSelect.SelectOption
+            firstSelectOption.id = 0
+            firstSelectOption.text = "Select Report Type"
+            PaymentAccountList.Add(firstSelectOption)
+            Items.Initialize(Me.User, CObj(SetUp))
+            Dim ItemList = (From i As kWItem In Items Select i).ToList
+            For Each opttionvalue In ItemList
+                Dim SelOption As New kWHTMLElementInputSelect.SelectOption
+                SelOption.id = opttionvalue.ID
+                SelOption.text = opttionvalue.Name
+                PaymentAccountList.Add(SelOption)
+            Next
+            Dim ReportType = kWHTMLElementInputSelect.CreateDirect(Me, 0, "ReportType", PaymentAccountList)
+            ReportType.SortOptions = False
+            ReportType.LabelString = "Report Type"
+            ReportType.FontSize = FontSize.medium
+            Return ReportType
+        End Function
+        Public Function AddItem(info As kWControlEventInfo) As kWControlEventReturnInfo
+            Dim longid As String = info.userObject.ItemReferance
+            Dim OwnerItem As kWItem = User.Get_Item_Object(longid).ClassObject
+            Dim SiteID = 0
+            If OwnerItem.ClassType = utlClassType.utlClassTypesitSite Then
+                SiteID = OwnerItem.ID
+            End If
+            'Dim errMsg As New StringBuilder
+            Dim Description As String = info.userObject.Description
+            Dim RepReportRegularity As Integer = info.userObject.RepReportRegularity
+            Dim ChkInvoice As Boolean = info.userObject.ChkInvoice
+            Dim ReportType As Integer = info.userObject.ReportType
+            Dim PaymentAccount As Integer = info.userObject.PaymentAccount
+            Dim ReportNote As String = info.userObject.ReportNote
+            Dim ReportStartDate As String = info.userObject.ReportStartDate
+            Dim ReportEndDate As String = info.userObject.ReportEndDate
+            Dim errMsg = ValidationSummary(Description, ChkInvoice, ReportType, PaymentAccount)
+            If Not String.IsNullOrEmpty(errMsg.ToString) Then
+                Return New kWControlEventReturnInfo With {.success = False, .returnMessage = errMsg.ToString}
+            End If
+            Try
+                Dim ReportdesignSetup As repReportDesignSetUp = Me.User.Banks(CStr(utlClassType.utlClassTyperepReportDesign_Bank)).SetUpObject
+                Dim NewReportdesign = ReportdesignSetup.Add(SiteID, Description, longid)
+                If RepReportRegularity > 0 Then
+                    NewReportdesign.ReportRegularity = RepReportRegularity
+                End If
+                If ChkInvoice Then
+                    If PaymentAccount > 0 Then
+                        NewReportdesign.Payment_Account_ID = PaymentAccount
+                    End If
+                    NewReportdesign.ReportRequiresRecipient = False
+                    If LCase(NewReportdesign.Description) = LCase("Invoice Report") Then
+                        For Each MonthRep In NewReportdesign.ItemReferance.ClassObject.ReportDesigns
+                            If LCase(MonthRep.ClassObject.Description) = LCase("Monthly Report") Then
+                                NewReportdesign.RelatedReportDesign_ID = MonthRep.ID
+                            End If
+                        Next
+                    End If
+                End If
+
+                If ChkInvoice.Equals(True) Then
+                    NewReportdesign.IsInvoice = ChkInvoice
+                End If
+                If ReportType > 0 Then
+                    NewReportdesign.Report_Definition_ID = ReportType
+                End If
+                NewReportdesign.SDate = ReportStartDate
+                NewReportdesign.EDate = ReportEndDate
+                NewReportdesign.Note = ReportNote
+                Dim ReportInfo As Object = New Dynamic.ExpandoObject
+                ReportInfo.targetReportGuid = CType(NewReportdesign.Reports_Definitions.Item_By_Name("LOCALHTML_" & TypeName(NewReportdesign)).ClassObject, defRun_Report_Definition).RunReportGUID ' "43567d47-b760-4c5a-b527-b9b702540a19"
+                ReportInfo.targetReportPropertiesGuid = Nothing '"{}"
+                Return New kWControlEventReturnInfo With {.success = True, .returnData = ReportInfo, .returnMessage = "Report Design Has Been Added Successfully"}
+            Catch ex As Exception
+                Return New kWControlEventReturnInfo With {.success = False, .returnMessage = ex.Message}
+            End Try
+        End Function
+
+        Public Function OpenpaymentAccountPage(ReferanceID) As kWControlEventReturnInfo
+            Dim ReferanceItem = Me.User.Get_Item_Object(CStr(ReferanceID), True).ClassObject
+            If ReferanceItem.ClassType = 6 Then
+                ReferanceItem = ReferanceItem.Company
+            End If
+            Dim Brow = New kWGlobalFunctions.kWBrowser
+            Brow.Item = Report
+            'This gets us the text we are after to run the report
+            PaymentAccountsReferance_new = CType(ReferanceItem, comCompany).Payment_AccountsInvoices
+            With PaymentAccountsReferance_new.Reports_Definitions.Item_By_Name("LOCALHTMLADD_kWItems").ClassObject
+                With .CodeObject
+                    .SetDefaults
+                    .CSSInclude = True
+                    .IncludeHeading = True
+                    .DefaultName = "Invoice Account"
+                    .DefaultItemReferance_ID = ReferanceItem.LongID
+                    .DefaultPayment_Account_Type = 2
+                    .ShowPayment_Account_Type = False
+                    .ShowItemReferance_ID = False
+                    .DefaultOpenItem = False
+                    .ItemReferance = ItemReferance & ".Reports_Definitions.Item_By_Name(~!~LOCALHTMLADD_kWItems~!~).classObject.codeObject.PaymentAccountsReferance"
+                End With
+                Brow.HTMLText = .EvaluateAsText(False)
+            End With
+            Dim Doc = Brow.ShowModal(-1, "New Payment Account", True, 0, 0) '= 9000, 12000)
+            Return New kWControlEventReturnInfo With {.success = True, .returnData = Doc.parentWindow.NewPaymentAccountID}
+        End Function
+#End Region
+#Region "Validation Summary"
+        Public Function ValidationSummary(Description As String, ChkInvoice As Boolean, ReportType As String, PaymentAccount As String) As StringBuilder
+            Dim errMsg As New StringBuilder
+            Dim DesignName As Boolean = ValidateSpecialCharacters(Description)
+            If DesignName = True Then
+                errMsg.AppendLine("Special Characters Not Allowed In Design Name</br>")
+            End If
+            If Description.Length = 0 Then
+                errMsg.AppendLine("Please Enter Brief Description For Report Design</br>")
+            End If
+            If ReportType = 0 Then
+                errMsg.AppendLine("Please Select Report Type For Report Design </br>")
+            End If
+            If ChkInvoice = True Then
+                If PaymentAccount = 0 Then
+                    errMsg.AppendLine("Please Select Payment Account For Report Design</br>")
+                End If
+            End If
+            Return errMsg
+        End Function
+        Function ValidateSpecialCharacters(stringname As String) As Boolean
+            Dim result As Boolean = False
+            result = stringname.IndexOfAny("[~`!@#$%^&*()-+=|{}':;.,<>/?]".ToCharArray) <> -1
+            Return result
+        End Function
+#End Region
+#Region "Default Code"
+        Public Function AddPaymentAccount()
+            Dim NewPymID
+
+            ''''''            If Len(ItemReferance.Value) > 0 Then
+            ''''''                NewPymID = CodeObject.CallCodeObject("AddPaymentAccount", ItemReferance.Value)
+
+            ''''''                If NewPymID > 0 Then
+            ''''''                    PaymentAccounts.InnerHTML = CodeObject.CallCodeObject("GetPaymentAccounts", ItemReferance.Value)
+            ''''''                    PaymentAccountID.Value = NewPymID
+            ''''''                    'PaymentAcountSelected NewPymID
+            ''''''                End If
+            ''''''            Else
+            ''''''                MsgBox "Please select who the Report Design is for first"
+            ''''''End If
+        End Function
+        Public Sub BrowserControl_onLoad()
+            On Error Resume Next
+            ' BrowserControl.SizeToFit
+        End Sub
+        Public Function GetCategories(MastCatID) As Boolean
+            If Len(MastCatID) > 0 Then
+                Dim MasterCatagory = Me.User.Get_Item_Object("146~" & MastCatID, True).ClassObject
+                With Me.User.Reports_Definitions.Item_By_Name("HTML_Select").ClassObject
+                    With .CodeObject
+                        .SetDefaults
+                        .ID = "CategoryID"
+                        '.kWID = Me.LongID
+                        '.DataField = "InvoiceType"
+                        .Width = "250px"
+                        '.List = "0,Hourly Rates|1,Specified Amount|2,Expenses"
+                        .Items = MasterCatagory.Category_Descriptions
+                        .Editable = True
+                        .ShowEditButton = False
+                        '.OnChange = "VbScript:Catagories.InnerHTML = CodeObject.CallCodeObject(""GetCategories"", Window.Event.srcElement.Value) "
+                    End With
+                    Return .EvaluateAsText(False)
+                End With
+            End If
+        End Function
+
+        Public Function AddCompany() As kWItem
+            'This will add a company and return the resultant ID of the company
+            Dim Items = New kWatchServer.kWItems
+            Dim SetUp = New kWatchServer.comCompanySetup
+            SetUp.Company_IDs = "0"
+            Items.Initialize(Me.User, CObj(SetUp))
+            Dim Brow = New kWGlobalFunctions.kWBrowser
+            Brow.Item = Report
+            'This gets us the text we are after to run the report
+            With Items.Reports_Definitions.Item_By_Name("LOCALHTMLADD_kWItems").ClassObject
+                With .CodeObject
+                    .SetDefaults
+                    .IncludeHeading = True
+                    .DefaultOpenItem = False
+                End With
+                Brow.HTMLText = .EvaluateAsText(False)
+            End With
+            Dim Doc = Brow.ShowModal(-1, "New Company", True, 0, 0) '8000, 9000)
+            Return Doc.parentWindow.NewCompanyID
+        End Function
+        Public Function PaymentAccountsReferance() As kWItem
+            'This will return a referance to an empty payment accounts object - this is referanced by this form to enable access to the payment accounts add form
+            Dim Items = New kWatchServer.kWItems
+            Dim SetUp = New kWatchServer.pymPayment_AccountSetUp
+            SetUp.Payment_Account_IDs = 0
+            Items.Initialize(Me.User, CObj(SetUp))
+            'Return the referance to nothing here
+            Return Items
+        End Function
+        Public Function PaymentAcountSelected(PymID) As Integer
+            'This will go through and load up the Payment Account Specific Information
+            If Len(PymID) = 0 Then PymID = 0
+            'This will be as follows
+            'If PymID = 0 Then
+            '    GST_Code.Value = 6
+            '    'Else
+            '    GST_Code.Value = CodeObject.GetProperty("User.Get_Item_Object(""142~" & PymID & """, True).ClassObject.GST_Code", Nothing)
+            'End If
+        End Function
+
+        Public Function IsReady()
+            'If Len(Description.Value) = 0 Then
+            '    problem = problem & "Please specify a brief description for the Report Design" & vbCrLf
+            'End If
+            'If Len(ItemReferance.Value) = 0 Then
+            '    problem = problem & "Please select who the report design is for" & vbCrLf
+            'Else
+            '    If IsInvoice.Checked Then
+            '        If PaymentAccountID.Value = 0 Then
+            '            problem = problem & "Please select a payment account for the report design" & vbCrLf
+            '        End If
+            '    End If
+            'End If
+            'If ReportDefinitionID.Value = 0 Then
+            '    problem = problem & "Please select the report type" & vbCrLf
+            'End If
+            'IsReady = problem
+        End Function
+        Public Function ItemReferanceUpdated(ByVal ItemReferance)
+            PaymentAccounts.InnerHTML = CodeObject.CallCodeObject("GetPaymentAccounts", ItemReferance)
+            If Len(ItemReferance) > 0 Then
+                '******************************PaymentAcountSelected PaymentAccountID.Value
+            Else
+                'PaymentAcountSelected 0
+            End If
+        End Function
+        <ThreadStatic()>
+        Public Shared SharedMe As WEBHTMLADD_kWItems
+        'Private _Entities As Entities
+        '''' <summary>
+        '''' This should only be used when updating properties, not in any other code - when you need the entities you should
+        '''' create it yourself
+        '''' </summary>
+        '''' <value></value>
+        '''' <returns></returns>
+        '''' <remarks></remarks>
+        'Public ReadOnly Property Entities As Entities
+        '    Get
+        '        If Not _Entities Is Nothing Then
+        '            If _Entities.IsDisposed Then
+        '                _Entities = Nothing
+        '            End If
+        '        End If
+        '        If _Entities Is Nothing Then
+        '            _Entities = New Entities(Me.User)
+        '        End If
+
+        '        Return _Entities
+        '    End Get
+        'End Property
+
+        ''' <summary>
+        ''' This can be used to associate an icon with this report that is different to the underlying report
+        ''' You could set this within the SetDefaults, or you could create a get and set componet of the 
+        ''' property and override it
+        ''' </summary>
+        ''' <returns></returns>
+        Public Property ReportIcon As Icons Implements WebForm.ReportIcon
+
+        ''' <summary>
+        ''' Initialization code in here for this report.  This code will be called each time the report is ran
+        ''' other call reports should also call this before using the report output or any contained functions
+        ''' </summary>
+        ''' <remarks></remarks>
+        Public Sub SetDefaults() Implements defReport_Definitions.defReportDefinitionBase.SetDefaults
+            ItemReferance = "User.Get_Item_Object(~!~" & Report.LongID & "~!~, True).ClassObject.Object"
+            DefaultItemReferanceID = Report.Object.SetUpObject.ClassObject.ItemReferanceIDs
+            ShowItemReferanceID = True
+            DefaultIsInvoice = False
+            DefaultOpenItem = True
+            ''''''''DefaultReportSDate = DateSerial(Year(Of Date), Month(Of Date), 1)'Check
+            DefaultReportEDate = String.Empty
+            DefaultDescription = String.Empty
+            DefaultReportDefinitionID = 0
+            DefaultPaymentAccountID = 0
+            CSSInclude = True
+            IncludeHeading = True
+            ShowAdd = True
+            SupressAddConfirmation = False
+            'Uncomment these lines if you have an entitites object
+            'If Not _Entities Is Nothing Then
+            '    _Entities.Dispose()
+            '    _Entities = Nothing
+            'End If
+            SharedMe = Me
+        End Sub
+
+        ''' <summary>
+        ''' This is a callback that is called after the report if produced.  The report is a document of type Word, Excel, Email or RTF
+        ''' This depends on the type of report produced
+        ''' </summary>
+        ''' <param name="ReportObj">The Report object</param>
+        ''' <remarks></remarks>
+        Public Sub AfterReportProduce(ByVal ReportObj As Object) Implements defReport_Definitions.defReportDefinitionBase.AfterReportProduce
+        End Sub
+
+        ''' <summary>
+        ''' The callback is called after the file has been saved to kWatch.  The file object is a referances to the filFile object that has 
+        ''' just been saved
+        ''' </summary>
+        ''' <param name="File">The newly saved file</param>
+        ''' <remarks></remarks>
+        Public Sub AfterFileSave(ByVal File As kWatchServer.filFile) Implements defReport_Definitions.defReportDefinitionBase.AfterFileSave
+        End Sub
+
+
+        ''' <summary>
+        ''' This is the web request object that has been passed back from the originating call. This contains
+        ''' information relating to the browser, the call been made and the IIS server that the call came from.
+        ''' This is a copy of the request object that is generated by the server 
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Property Request As UserRequest Implements WebForm.Request
+
+        ''' <summary>
+        ''' This is the WebSite that this request belongs to
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Property Web As webWebSite Implements WebForm.Web
+
+        ''' <summary>
+        ''' This is the webContact that relatest to this request
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Property WebContact As webContactLogin Implements WebForm.WebContact
+
+#Region "Settings"
+
+        ''' <summary>
+        ''' This will return the settings object as a dynamic expando object that you can review and edit.  If you
+        ''' want your settings object casted to a specific type, use the GetSettings function.  Setting an object
+        ''' to this location will also update the settings object for you as well
+        ''' 
+        ''' This will get the settings object for this report object.  Settings objects are unique based on
+        ''' the RunReportID, LoggedInContact (either web or local), The active WebID or web site, a DashboardwidgetID and
+        ''' optionaly a SettingsLocationID that you might choose to use.
+        ''' 
+        ''' So for a kWatch report delivered within kWatch - this would be unique based on RunReportID and contactID only as
+        ''' webID, DashboardwidgetID and SettinglocationID are all nothing
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Property Settings As Object Implements WebForm.Settings
+            Get
+                Return WebManagement.SettingsManagement.GetSettings(Me) ' Newtonsoft.Json.JsonConvert.DeserializeObject(Of ExpandoObject)(Me.SettingsRecord.SettingsObject)
+            End Get
+            Set(value As Object)
+                WebManagement.SettingsManagement.SaveSettings(value, Me)
+            End Set
+        End Property
+
+        ''' <summary>
+        ''' This will return the settings object as a dynamic expando object that you can review and edit.  If you
+        ''' want your settings object casted to a specific type, use the GetSettings function.  Setting an object
+        ''' to this location will also update the settings object for you as well
+        ''' 
+        ''' This will get the settings object for this report object.  Settings objects are unique based on
+        ''' the RunReportID, LoggedInContact (either web or local), The active WebID or web site, a DashboardwidgetID and
+        ''' optionaly a SettingsLocationID that you might choose to use.
+        ''' 
+        ''' So for a kWatch report delivered within kWatch - this would be unique based on RunReportID and contactID only as
+        ''' webID, DashboardwidgetID and SettinglocationID are all nothing
+        ''' </summary>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Function GetSettings(Of SettingObjectType)() As SettingObjectType Implements WebForm.GetSettings
+
+            Return WebManagement.SettingsManagement.GetSettings(Of SettingObjectType)(Me)
+
+        End Function
+
+        ''' <summary>
+        ''' This will save the settings object to the database
+        ''' </summary>
+        ''' <typeparam name="SettingObjectType"></typeparam>
+        ''' <param name="Obj"></param>
+        ''' <remarks></remarks>
+        Public Sub SaveSettings(Of SettingObjectType)(Obj As SettingObjectType) Implements WebForm.SaveSettings
+
+            WebManagement.SettingsManagement.SaveSettings(Obj, Me)
+
+        End Sub
+
+        ''' <summary>
+        ''' This is a global property that if set - will be used as a reportProperties object by the dash-board component
+        ''' You do not need to set this - and it is set if this report is used as 
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        <kWHTML.kWForms.reportProperty>
+        Public Property DashboardWidgetID As Integer? Implements WebForm.DashboardWidgetID
+        ''' <summary>
+        ''' This will get the settings record for this report object.  Settings objects are created and unique based on
+        ''' the RunReportID, LoggedInContact (either web or local), The active WebID or web site, a dash-board Widget ID and
+        ''' optionaly a SettingsLocationID that you might choose to use.
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public ReadOnly Property SettingsRecord As defReportSetting Implements WebForm.SettingsRecord
+            Get
+                Return WebManagement.SettingsManagement.GetSettingsRecord(Me)
+            End Get
+        End Property
+        ''' <summary>
+        ''' This will return the guid that is used within the report object
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public ReadOnly Property ReportPropertiesGuid As Guid Implements WebForm.ReportPropertiesGuid
+            Get
+                Return WebManagement.SettingsManagement.getReportPropertiesGuid(Me)
+            End Get
+        End Property
+
+        ''' <summary>
+        ''' This wil return the report properties object for this report
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public ReadOnly Property ReportProperties As Object Implements WebForm.ReportProperties
+            Get
+                Return WebManagement.SettingsManagement.GetReportProperties(Me)
+            End Get
+        End Property
+#End Region
+#End Region
+    End Class
+End Namespace

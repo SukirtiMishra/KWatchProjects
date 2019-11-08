@@ -1,0 +1,190 @@
+
+//Add custom code to the form base goes right here - this is where you add custom functions that you need
+//to add to the form base object
+function onLoadFormBase1574(formBase) { //Place my custom code in here - this can then be called from the form
+
+    formBase.RefreshInvoiceSection = function (control, ControlInfo, result, ContinueCallBack, FailCallBack) {
+        try {
+            
+
+            // #### Alex Review 10/7/19 - 'this' needs to replaced by formbase. If consistent, make standard
+            var LongID = formBase.getControl("ItemReferance").value();
+            var Isinvoice = formBase.getControl("ChkInvoice").value();
+
+            
+            if (LongID == "") {
+             
+                LongID = "6~6004";
+            }
+          
+            formBase.RefreshCreatedPaymentAccount(LongID, Isinvoice, function (result) {
+
+                try {
+                   
+                    if (result.success) {
+                      
+                        //control.formBase() maybe can be replaced by formBase()
+                      
+                        var FilterSectionDIV = $(control.formBase().element).find("#InvoiceDIV");
+                        //; should be used as standard line terminator
+                        FilterSectionDIV.html(result.returnData);
+                    
+
+                    } else {
+                        bootbox.alert(result.returnMessage);
+                    }
+                } catch (e) {
+                    bootbox.alert("Failed -  " + e);
+                }
+
+                ContinueCallBack();
+
+            }, function (error) {
+               
+                FailCallBack(error.toString());
+            })
+        }
+
+        catch (e) {
+
+            FailCallBack(e.toString());
+
+        }
+
+    }
+
+
+    formBase.OpenPaymentAccountWindow = function (control, ControlInfo, result, ContinueCallBack, FailCallBack) {
+
+        var LongID = formBase.getControl("ItemReferance").value();
+
+        formBase.OpenpaymentAccountPage(LongID, function (result) {
+            try {
+                if (result.success) {
+
+                    var NewPaymentAccountID = result.returnData
+                    //#### Alex Review 10/7/19 -  what this below function does??
+                    //## removed toggleCodeSelection as it was not used anywhere 
+                    formBase.getControl("PaymentAccount").value(NewPaymentAccountID);
+
+                } else {
+                    bootbox.alert(result.returnMessage);
+                }
+            } catch (e) {
+                bootbox.alert("Failed -  " + e);
+            }
+            ContinueCallBack();
+        }, function (error) {
+            bootbox.alert(error);
+            FailCallBack(error.toString());
+        })
+
+
+        ContinueCallBack();
+    }
+
+
+
+    formBase.BeforeAddClick = function (control, ControlInfo, continueCallBack, failCallBack) {
+       
+        try {
+            debugger
+
+            var PaymentAccountID = 0;
+
+            if (formBase.getControl("ChkInvoice").value() === true) {
+                PaymentAccountID = formBase.getControl("PaymentAccount").value();
+            }
+
+                      
+            ControlInfo.userObject = {
+                ItemReferance: formBase.getControl("ItemReferance").value(),
+                Description: formBase.getControl("Description").value(),
+                RepReportRegularity: formBase.getControl("RepReportRegularity").value(),
+                ChkInvoice: formBase.getControl("ChkInvoice").value(),
+                ReportType: formBase.getControl("ReportType").value(),
+                PaymentAccount: PaymentAccountID,
+                ReportNote: formBase.getControl("ReportNote").value(),
+                ReportStartDate: formBase.getControl("ReportStartDate").value(),
+                ReportEndDate: formBase.getControl("ReportEndDate").value()
+            };
+          
+
+
+            //#### Alex Review 10/7/19 - Move validation to server side code
+
+            
+
+            continueCallBack();
+
+        }
+        catch (e) {
+            bootbox.alert("There was an error in the code", failCallBack());
+        }
+    }
+
+  
+  
+    formBase.AfterAddClick = function (control, ControlInfo, result, ContinueCallBack, FailCallBack) {                  
+        try {
+            if (result.success) {
+                //#### Alex Review 10/7/19 - Use this method to set variables up
+                    formBase.getControl("Description").value("");
+                    formBase.getControl("RepReportRegularity").value(0);
+                    formBase.getControl("ReportType").value(0);
+                    formBase.getControl("ReportNote").value("");
+                    formBase.getControl("ChkInvoice").value(false);
+                               
+                //#### Alex Review 7/8/19 - We cant change DIV content like this. We need to call the refresh function
+                    var FilterSectionDIV = $(control.formBase().element).find("#InvoiceDIV");                   
+                    FilterSectionDIV.html(result.returnData);
+                                                
+                    bootbox.alert(result.returnMessage);
+                    ContinueCallBack();
+                    if (formBase.getControl("OpenItem").value() == true) {
+                            try {
+                                kWLink.runReport(control.element, result.returnData.targetReportGuid, result.returnData.targetReportPropertiesGuid, 1, null, function (res) { }, null, null)
+                                if (result.returnMessage) {
+                                    bootbox.alert(result.returnMessage, function () { CloseBrowser() })
+                                } else {
+                                    CloseBrowser()
+                                }
+                                ContinueCallBack();
+                            }
+                        catch (e) {
+                            FailCallBack(e);
+                        }
+                    }
+                    else {                       
+                       
+                        if (result.returnMessage) {
+                            bootbox.alert(result.returnMessage, function () {CloseBrowser()})
+                        } else {
+                            CloseBrowser()
+                        }
+
+                        ContinueCallBack();
+
+                    }
+
+            }
+            else {
+                    bootbox.alert(result.returnMessage);
+                    ContinueCallBack();
+                }
+        }
+
+        catch (e) {
+            FailCallBack(e);
+        }     
+
+    }
+
+}
+
+
+
+
+
+
+

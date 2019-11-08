@@ -1,0 +1,371 @@
+Imports kWHTML
+Imports kWHTML.Elements
+Imports WebManagement
+Imports kWHTML.kWForms
+Imports System.Text
+
+Namespace kWatchServer.chrDemandResetss
+    ''' <summary>"
+    ''' Define all custom code for this assembly within this class 
+    ''' </summary>
+    ''' <remarks></remarks>
+    Public Class WEBHTMLADD_kWItems
+        Implements WebForm
+#Region "Public Variables"
+        Public DefaultOpenItem As Boolean
+
+#End Region
+#Region " Form(Page) Load Methods"
+        ''' <summary>
+        ''' Main function that is returned to the lines of the report when it is ran
+        ''' </summary>
+        ''' <param name="html"></param>
+        ''' <remarks></remarks>
+        Public Sub GetReport(html As HTMLTextWriterkWatch) Implements WebForm.GetReport
+            Dim repBase = GetReportBase()
+            repBase.ToString(html)
+        End Sub
+        Public Function GetReportBase() As HTMLkWFormBase Implements WebForm.GetReportBase
+            Dim Form = HTMLkWFormBase.Create(Me)
+            Form.onLoadFormBase = "onLoadFormBase1571"
+            Form.JScript.Add(My.Resources.ClientScript)
+            If ItemReferenceObject() Is Nothing Then
+                Form.FormSectionMain.Add(New HTMLText("Demand Reset Cannot Be Added From This Location"))
+                Return Form
+            End If
+            Form.FormHeader.FormName = "Add Demand Reset"
+            'OwnerComapny
+            Form.FormSectionMain.Add("Site", SelectOwnerItem)
+            'Description 
+            Form.FormSectionMain.Add(DescriptionControl)
+            'Reset Type
+            Form.FormSectionMain.Add(DemandTypeControl)
+            'Add Demand Report
+            Form.FormSectionMain.Add(AddDemandReportDiv)
+            'Open Item
+            Form.FormSectionMain.Add(OpenItemCheckbox)
+            'Script Function
+            Form.ScriptFunctionCallCodeObjectAdd(Function(c) c.AddItem(Nothing))
+            Return Form
+        End Function
+        Public Function RefreshFormBase() As String Implements WebForm.RefreshFormBase
+            'Get the report
+            Dim repBase As HTMLkWFormBase(Of WEBHTMLADD_kWItems) = GetReportBase()
+            'This will exclude the jscript code and other items
+            repBase.RefreshPageCall = True
+            Dim html As New HTMLTextWriterkWatch
+            repBase.ToString(html)
+            Return html.ToString
+        End Function
+#End Region
+#Region "All Controls"
+        Public Function SelectOwnerItem() As HTMLElementDIV
+            Dim Division As New HTMLElementDIV
+            Dim SelectOwnerCompany = KWSelectItem.CreateDirect(Me, {utlClassType.utlClassTypesitSite}, "SelectOwnerCompany", Site().ToString)
+            SelectOwnerCompany.LabelString = ""
+            Division.Controls.Add(SelectOwnerCompany)
+            Return Division
+        End Function
+        Public Function DescriptionControl() As kWHTMLElementInputText(Of WEBHTMLADD_kWItems)
+            Dim Description = kWHTMLElementInputText.Create(Me, Nothing)
+            Description.LabelString = "Description "
+            Description.ID = "Description"
+            Description.ClassName = "form-control"
+            Return Description
+        End Function
+        Public Function DemandTypeControl() As kWHTMLElementInputSelect(Of WEBHTMLADD_kWItems, Integer)
+            Dim DemandType = kWHTMLElementInputSelect.CreateDirect(Me, 0, "DemandType", Optionsalesphase())
+            DemandType.LabelString = "Reset Type"
+            Return DemandType
+        End Function
+        Public Function AddDemandReportDiv() As HTMLElementDIV
+            Dim Divs As New HTMLElementDIV
+            Dim AddDemandReport = kWHTMLElementButton.Create(Me, "Add Demand Reset")
+            AddDemandReport.ID = "AddDemandReport"
+            AddDemandReport.onClickEvent.onBeforeTriggerFunctionName = "BeforeAddClick"
+            AddDemandReport.onClickEvent.eventDelegate = Function(c) c.AddItem(Nothing)
+            AddDemandReport.onClickEvent.onAfterTriggerFunctionName = "AfterAddClick"
+            AddDemandReport.ClassName = "btn btn-primary btn-md"
+            Divs.Controls.Add(AddDemandReport)
+            Return Divs
+        End Function
+        Public Function OpenItemCheckbox() As HTMLElementDIV
+            Dim DivOpenItem As New HTMLElementDIV
+            Dim ChkOpenItemCheckbox = kWHTMLElementInputCheckBox.Create(Me, Nothing)
+            ChkOpenItemCheckbox.LabelString = "Open Item"
+            ChkOpenItemCheckbox.ID = "OpenItem"
+            DivOpenItem.Controls.Add(ChkOpenItemCheckbox)
+            Return DivOpenItem
+        End Function
+#End Region
+#Region "Calculation "
+        Public Function ItemReferenceObject() As kWItem
+            If Len(Me.User.Company.LongID) > 0 Then
+                Dim LongID = Me.User.Company.LongID
+                Return Me.User.Get_Item_Object(LongID).ClassObject
+            End If
+            Return Nothing
+        End Function
+        Public Function GetSiteID() As String
+            Dim SitaID = Me.SetUpObject.ClassObject.Site_IDs
+            Return SitaID
+        End Function
+
+        Public Function Site() As String
+            Dim sitname As sitSite = Me.User.Get_Item_Object(utlClassType.utlClassTypesitSite & "~" & GetSiteID(), True).ClassObject
+            Return sitname.LongID
+        End Function
+
+        Public Function AddItem(info As kWControlEventInfo) As kWControlEventReturnInfo
+            Try
+                Dim errMsg As New StringBuilder
+                Dim Description As String = info.userObject.Description
+                Dim DemandResetType As Integer = info.userObject.DemandResetType
+                Dim errmessage As StringBuilder = CheckValidation(Description)
+                If Not String.IsNullOrEmpty(errmessage.ToString) Then
+                    Return New kWControlEventReturnInfo With {.success = False, .returnMessage = errmessage.ToString}
+                End If
+                Dim DemandReset As chrDemandResetsSetUp = Me.User.Banks(CStr(utlClassType.utlClassTypechrDemandResets_Bank)).SetUpObject
+                Dim Adddemand = DemandReset.Add(Me.SetUpObject.ClassObject.Site_IDs, Description)
+                Dim id As String = Adddemand.ID
+                Adddemand.DemandType = DemandResetType
+                Dim ReportInfo As Object = New Dynamic.ExpandoObject
+                ReportInfo.targetReportGuid = CType(Adddemand.Reports_Definitions.Item_By_Name("LOCALHTML_" & TypeName(Adddemand)).ClassObject, defRun_Report_Definition).RunReportGUID ' "43567d47-b760-4c5a-b527-b9b702540a19"
+                ReportInfo.targetReportPropertiesGuid = Nothing '"{}"
+                Return New kWControlEventReturnInfo With {.success = True, .returnData = ReportInfo, .returnMessage = "Demand Reset Has Been Added ID = " & id}
+            Catch ex As Exception
+                Return New kWControlEventReturnInfo With {.success = False, .returnMessage = ex.Message}
+            End Try
+        End Function
+        Public Function Optionsalesphase() As List(Of kWHTMLElementInputSelect.SelectOption)
+            Dim options As New List(Of kWHTMLElementInputSelect.SelectOption)
+            options.Add(New kWHTMLElementInputSelect.SelectOption With {.id = "0", .text = "None"})
+            options.Add(New kWHTMLElementInputSelect.SelectOption With {.id = "2", .text = "kVa"})
+            options.Add(New kWHTMLElementInputSelect.SelectOption With {.id = "1", .text = "kW"})
+            options.Add(New kWHTMLElementInputSelect.SelectOption With {.id = "3", .text = "GJ"})
+            options.Add(New kWHTMLElementInputSelect.SelectOption With {.id = "4", .text = "Demand ID"})
+            options.Add(New kWHTMLElementInputSelect.SelectOption With {.id = "7", .text = "Pricing And Demand ID"})
+            Return options
+        End Function
+#End Region
+#Region "Validation Summary"
+        Public Function CheckValidation(Description As String) As StringBuilder
+            Dim errMsg As New StringBuilder
+            Dim ReportNameResult As Boolean = ValidateSpecialCharacters(Description)
+            If Description.Length <= 0 Then
+                errMsg.AppendLine("Please Enter Description Of The Object</br>")
+            End If
+            Return errMsg
+        End Function
+        Function ValidateSpecialCharacters(stringname As String) As Boolean
+            Dim result As Boolean = False
+            result = stringname.IndexOfAny("[~`!@#$%^&*()-+=|{}':;.,<>/?]".ToCharArray) <> -1
+            Return result
+        End Function
+#End Region
+#Region "Default Code"
+        Public Function GetAddProcedure()
+            'Use this procedure to get the add command procedure that is used to add items of this type to the SQL server
+            Return Me.Bank.AddCommandProcedure
+            'CREATE Procedure #chrDemandResets_Add
+            '(@Site_ID int, @Description VarChar(1000)) As 
+            'SET NOCOUNT ON
+            'INSERT INTO  chrDemandResets(Site_ID, Description)
+            'VALUES (@Site_ID, @Description)
+            'SELECT @@IDENTITY ID
+            'RETURN
+        End Function
+        <ThreadStatic()>
+        Public Shared SharedMe As WEBHTMLADD_kWItems
+        'Private _Entities As Entities
+        '''' <summary>
+        '''' This should only be used when updating properties, not in any other code - when you need the entities you should
+        '''' create it yourself
+        '''' </summary>
+        '''' <value></value>
+        '''' <returns></returns>
+        '''' <remarks></remarks>
+        'Public ReadOnly Property Entities As Entities
+        '    Get
+        '        If Not _Entities Is Nothing Then
+        '            If _Entities.IsDisposed Then
+        '                _Entities = Nothing
+        '            End If
+        '        End If
+        '        If _Entities Is Nothing Then
+        '            _Entities = New Entities(Me.User)
+        '        End If
+
+        '        Return _Entities
+        '    End Get
+        'End Property
+        ''' <summary>
+        ''' This can be used to associate an icon with this report that is different to the underlying report
+        ''' You could set this within the SetDefaults, or you could create a get and set componet of the 
+        ''' property and override it
+        ''' </summary>
+        ''' <returns></returns>
+        Public Property ReportIcon As Icons Implements WebForm.ReportIcon
+        ''' <summary>
+        ''' Initialization code in here for this report.  This code will be called each time the report is ran
+        ''' other call reports should also call this before using the report output or any contained functions
+        ''' </summary>
+        ''' <remarks></remarks>
+        Public Sub SetDefaults() Implements defReport_Definitions.defReportDefinitionBase.SetDefaults
+            'Uncomment these lines if you have an entitites object
+            'If Not _Entities Is Nothing Then
+            '    _Entities.Dispose()
+            '    _Entities = Nothing
+            'End If
+            DefaultOpenItem = False
+            SharedMe = Me
+        End Sub
+        ''' <summary>
+        ''' This is a callback that is called after the report if produced.  The report is a document of type Word, Excel, Email or RTF
+        ''' This depends on the type of report produced
+        ''' </summary>
+        ''' <param name="ReportObj">The Report object</param>
+        ''' <remarks></remarks>
+        Public Sub AfterReportProduce(ByVal ReportObj As Object) Implements defReport_Definitions.defReportDefinitionBase.AfterReportProduce
+        End Sub
+        ''' <summary>
+        ''' The callback is called after the file has been saved to kWatch.  The file object is a referances to the filFile object that has 
+        ''' just been saved
+        ''' </summary>
+        ''' <param name="File">The newly saved file</param>
+        ''' <remarks></remarks>
+        Public Sub AfterFileSave(ByVal File As kWatchServer.filFile) Implements defReport_Definitions.defReportDefinitionBase.AfterFileSave
+        End Sub
+        ''' <summary>
+        ''' This is the web request object that has been passed back from the originating call. This contains
+        ''' information relating to the browser, the call been made and the IIS server that the call came from.
+        ''' This is a copy of the request object that is generated by the server 
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Property Request As UserRequest Implements WebForm.Request
+        ''' <summary>
+        ''' This is the WebSite that this request belongs to
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Property Web As webWebSite Implements WebForm.Web
+        ''' <summary>
+        ''' This is the webContact that relatest to this request
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Property WebContact As webContactLogin Implements WebForm.WebContact
+
+#Region "Settings"
+
+        ''' <summary>
+        ''' This will return the settings object as a dynamic expando object that you can review and edit.  If you
+        ''' want your settings object casted to a specific type, use the GetSettings function.  Setting an object
+        ''' to this location will also update the settings object for you as well
+        ''' 
+        ''' This will get the settings object for this report object.  Settings objects are unique based on
+        ''' the RunReportID, LoggedInContact (either web or local), The active WebID or web site, a DashboardwidgetID and
+        ''' optionaly a SettingsLocationID that you might choose to use.
+        ''' 
+        ''' So for a kWatch report delivered within kWatch - this would be unique based on RunReportID and contactID only as
+        ''' webID, DashboardwidgetID and SettinglocationID are all nothing
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Property Settings As Object Implements WebForm.Settings
+            Get
+                Return WebManagement.SettingsManagement.GetSettings(Me) ' Newtonsoft.Json.JsonConvert.DeserializeObject(Of ExpandoObject)(Me.SettingsRecord.SettingsObject)
+            End Get
+            Set(value As Object)
+                WebManagement.SettingsManagement.SaveSettings(value, Me)
+            End Set
+        End Property
+
+        ''' <summary>
+        ''' This will return the settings object as a dynamic expando object that you can review and edit.  If you
+        ''' want your settings object casted to a specific type, use the GetSettings function.  Setting an object
+        ''' to this location will also update the settings object for you as well
+        ''' 
+        ''' This will get the settings object for this report object.  Settings objects are unique based on
+        ''' the RunReportID, LoggedInContact (either web or local), The active WebID or web site, a DashboardwidgetID and
+        ''' optionaly a SettingsLocationID that you might choose to use.
+        ''' 
+        ''' So for a kWatch report delivered within kWatch - this would be unique based on RunReportID and contactID only as
+        ''' webID, DashboardwidgetID and SettinglocationID are all nothing
+        ''' </summary>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Function GetSettings(Of SettingObjectType)() As SettingObjectType Implements WebForm.GetSettings
+
+            Return WebManagement.SettingsManagement.GetSettings(Of SettingObjectType)(Me)
+
+        End Function
+
+        ''' <summary>
+        ''' This will save the settings object to the database
+        ''' </summary>
+        ''' <typeparam name="SettingObjectType"></typeparam>
+        ''' <param name="Obj"></param>
+        ''' <remarks></remarks>
+        Public Sub SaveSettings(Of SettingObjectType)(Obj As SettingObjectType) Implements WebForm.SaveSettings
+
+            WebManagement.SettingsManagement.SaveSettings(Obj, Me)
+
+        End Sub
+
+        ''' <summary>
+        ''' This is a global property that if set - will be used as a reportProperties object by the dash-board component
+        ''' You do not need to set this - and it is set if this report is used as 
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        <kWHTML.kWForms.reportProperty>
+        Public Property DashboardWidgetID As Integer? Implements WebForm.DashboardWidgetID
+        ''' <summary>
+        ''' This will get the settings record for this report object.  Settings objects are created and unique based on
+        ''' the RunReportID, LoggedInContact (either web or local), The active WebID or web site, a dash-board Widget ID and
+        ''' optionaly a SettingsLocationID that you might choose to use.
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public ReadOnly Property SettingsRecord As defReportSetting Implements WebForm.SettingsRecord
+            Get
+                Return WebManagement.SettingsManagement.GetSettingsRecord(Me)
+            End Get
+        End Property
+
+
+        ''' <summary>
+        ''' This will return the guid that is used within the report object
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public ReadOnly Property ReportPropertiesGuid As Guid Implements WebForm.ReportPropertiesGuid
+            Get
+                Return WebManagement.SettingsManagement.getReportPropertiesGuid(Me)
+            End Get
+        End Property
+
+        ''' <summary>
+        ''' This wil return the report properties object for this report
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public ReadOnly Property ReportProperties As Object Implements WebForm.ReportProperties
+            Get
+                Return WebManagement.SettingsManagement.GetReportProperties(Me)
+            End Get
+        End Property
+#End Region
+#End Region
+    End Class
+End NameSpace

@@ -1,0 +1,121 @@
+
+//Add custom code to the form base goes right here - this is where you add custom functions that you need
+//to add to the form base object
+function onLoadFormBase1575(formBase) {
+
+    formBase.GetBaseClassTemplate = function (control, ControlInfo, result, ContinueCallBack, FailCallBack) {
+
+        formBase.GetTemplate(control.value(), function (result) {
+            try {
+                if (result.success) {
+                    var FilterSectionDIV = $(control.formBase().element).find("#Dropdowntemplate")
+                    FilterSectionDIV.html(result.returnData)
+                    //## Alex Review 23/7/19 - There doesnt seem to be any code to refresh your description. You need to get the description from the server
+                    $("#templateDescription").hide(200);
+
+                } else {
+
+                    bootbox.alert(result.returnMessage)
+                }
+
+            }
+
+            catch (e) {
+                bootbox.alert("Failed -  " + e)
+            }
+            ContinueCallBack()
+        }, function (error) {
+            bootbox.alert(error);
+            FailCallBack(error.toString());
+        })
+    }
+
+
+    formBase.showhidetemplatedesc = function (control, ControlInfo, result, ContinueCallBack, FailCallBack) {
+        formBase.Showdidetemplate(control.value(), function (result) {
+            try {
+                if (result.success) {
+                    //## Alex Review 23/7/19 - There doesnt seem to be any code to refresh your description. You need to get the description from the server
+                    $("#templateDescription").hide(200);
+
+                } 
+            } catch (e) {
+                bootbox.alert("Failed -  " + e)
+            }
+            ContinueCallBack()
+        }, function (error) {
+            bootbox.alert(error);
+            FailCallBack(error.toString());
+        })
+    }
+
+
+    formBase.BeforeAddClick = function (control, ControlInfo, continueCallBack, failCallBack) {
+
+        try {
+
+            ControlInfo.userObject = {
+                ReportName: formBase.getControl("ReportName").value(),
+                ClassType: formBase.getControl("BaseClassType").value(),
+                CodeType: formBase.getControl("CodeType").value(),
+                BaseclassTemplate: formBase.getControl("BaseclassTemplate").value()
+            };
+
+            continueCallBack();
+
+        }
+        catch (e) {
+            bootbox.alert(e.message, failCallBack())
+        }
+    }
+
+
+    formBase.AfterAddClick = function (control, ControlInfo, result, ContinueCallBack, FailCallBack) {
+        
+        try {
+            if (result.success) {
+                formBase.getControl("ReportName").value("");
+                formBase.getControl("BaseClassType").value(0);
+                formBase.getControl("BaseclassTemplate").value(0)
+
+                if (formBase.getControl("OpenItem").value() == true) {
+                    try {
+                        kWLink.runReport(control.element, result.returnData.targetReportGuid, result.returnData.targetReportPropertiesGuid, 1, null, function (res) { }, null, null)
+
+                        if (result.returnMessage) {
+                            bootbox.alert(result.returnMessage, function () { CloseBrowser() })
+                        } else {
+                            CloseBrowser()
+                        }
+                        ContinueCallBack();
+                    }
+                    catch (e) {
+                        FailCallBack(e);
+                    }
+                }
+                else {
+
+                    if (result.returnMessage) {
+                        bootbox.alert(result.returnMessage, function () { CloseBrowser() })
+                    } else {
+                        CloseBrowser()
+                    }
+
+                    ContinueCallBack();
+
+                }
+
+            }
+            else {
+                bootbox.alert(result.returnMessage);
+                ContinueCallBack();
+            }
+        }
+
+        catch (e) {
+            FailCallBack(e);
+        }
+
+    }
+
+}

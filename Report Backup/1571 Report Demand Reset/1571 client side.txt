@@ -1,0 +1,71 @@
+function onLoadFormBase1571(formBase) {
+
+    formBase.BeforeAddClick = function (control, ControlInfo, continueCallBack, failCallBack) {
+
+        try {
+            ControlInfo.userObject = {
+                Description: formBase.getControl("Description").value(),
+                DemandResetType: formBase.getControl("DemandType").value()
+
+            };
+
+            continueCallBack();
+
+        }
+        catch (e) {
+            bootbox.alert(e.message, failCallBack());
+        }
+    }
+
+   
+    formBase.AfterAddClick = function (control, ControlInfo, result, ContinueCallBack, FailCallBack) {
+        try {
+
+            if (result.success) {
+                formBase.getControl("Description").value("");
+                formBase.getControl("DemandType").value(0);
+           
+                if (formBase.getControl("OpenItem").value() == true) {
+                    try {
+
+                        kWLink.runReport(control.element, result.returnData.targetReportGuid, result.returnData.targetReportPropertiesGuid, 1, null, function (result) { }, null, null)
+
+                        if (result.returnMessage) {
+                            bootbox.alert(result.returnMessage, function (result) { CloseBrowser() })
+                        } else {
+                            CloseBrowser()
+                        }
+                        ContinueCallBack();
+                    }
+                    catch (e) {
+                        FailCallBack(e);
+                    }
+                }
+                else {
+
+                    if (result.returnMessage) {
+                        bootbox.alert(result.returnMessage, function () { CloseBrowser() })
+                    } else {
+                        CloseBrowser()
+                    }
+
+                    ContinueCallBack();
+
+                }
+
+            }
+            else {
+                bootbox.alert(result.returnMessage);
+                ContinueCallBack();
+            }
+        }
+
+        catch (e) {
+            FailCallBack(e);
+        }
+
+    }
+
+}
+
+

@@ -1,0 +1,102 @@
+
+//Add custom code to the form base goes right here - this is where you add custom functions that you need
+//to add to the form base object
+function onLoadFormBase1548(formBase) {
+    
+
+    formBase.RefreshStructureUse = function (control, ControlInfo, result, ContinueCallBack, FailCallBack) {
+        formBase.GetControlValue(control.value(), function (result) {
+            try {
+                if (result.success) {
+                    var FilterSectionDIV = $(control.formBase().element).find("#ImportType");
+                    FilterSectionDIV.html(result.returnData);
+                } else {
+                    bootbox.alert(result.returnMessage);
+                }
+            } catch (e) {
+                bootbox.alert("Failed -  " + e);
+            }
+            ContinueCallBack();
+        }, function (error) {
+            bootbox.alert(error);
+            FailCallBack(error.toString());
+        });
+    };
+
+    formBase.BeforeAddClick = function (control, ControlInfo, continueCallBack, failCallBack) {
+       
+        try {
+                ControlInfo.userObject = {
+                Description: formBase.getControl("Description").value(),
+                Site: formBase.getControl("SourceID").value(),
+                StructureUse: formBase.getControl("StructureUse").value(),
+                ImpotType: formBase.getControl("ImportTypeSelectInputCell").value(),
+                DataSource: formBase.getControl("OwnerItemID").value(),
+                Interval: formBase.getControl("NewDataStructureInterval").value(),
+                DefaultFields: formBase.getControl("AddDefaultFields").value(),
+                MarkAsExport: formBase.getControl("AddAsImport").value()
+            };
+
+            continueCallBack();
+
+        }
+        catch (e) {
+            bootbox.alert("There was an error in the code", failCallBack());
+        }
+    }
+       
+      
+ formBase.AfterAddClick = function (control, ControlInfo, result, ContinueCallBack, FailCallBack) {
+
+        try {
+           
+            if (result.success) {
+
+                formBase.getControl("Description").value("");
+                formBase.getControl("OwnerItemID").value(0);
+                if (formBase.getControl("OpenItem").value() == true) {
+                    try {
+                        kWLink.runReport(control.element, result.returnData.targetReportGuid, result.returnData.targetReportPropertiesGuid, 1, null, function (res) { }, null, null)
+
+                        if (result.returnMessage) {
+                            bootbox.alert(result.returnMessage, function () { CloseBrowser() })
+                        } else {
+                            CloseBrowser()
+                        }
+                        ContinueCallBack();
+                    }
+                    catch (e) {
+                        FailCallBack(e);
+                    }
+                }
+                else {
+
+                    if (result.returnMessage) {
+                        bootbox.alert(result.returnMessage, function () { CloseBrowser() })
+                    } else {
+                        CloseBrowser()
+                    }
+
+                    ContinueCallBack();
+
+                }
+
+            }
+            else {
+                bootbox.alert(result.returnMessage);
+                ContinueCallBack();
+            }
+        }
+
+        catch (e) {
+            FailCallBack(e);
+        }
+
+    }
+}
+
+
+   
+
+
+
