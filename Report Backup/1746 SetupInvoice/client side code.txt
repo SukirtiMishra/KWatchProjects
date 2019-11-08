@@ -1,0 +1,131 @@
+
+//Add custom code to the form base goes right here - this is where you add custom functions that you need
+//to add to the form base object
+function onLoadFormBase1746(formBase) {
+    //Place my custom code in here - this can then be called from the form
+    //base of this report object at anytime - this would equal the formbase that we want to 
+    //access   
+    formBase.OpenTaskSetUpInvoice = function (control, ControlInfo, result, ContinueCallBack, FailCallBack) {
+        try {
+            // var TaskID = document.getElementById('TaskIDValue').Value;
+            //var id = formBase.getControl("TaskIDValue").value;
+            formBase.ReturnTaskSetUpInvoice(ControlInfo.userObject.ItemID, function (result) {
+                try {
+                    if (result.success) {
+                        try {
+                            kWLink.runReport(control.element, result.returnData.targetReportGuid, result.returnData.targetReportPropertiesGuid, 1, null, function (res) { }, null, null)
+
+                            ContinueCallBack();
+                        }
+                        catch (e) {
+                            FailCallBack(e);
+                        }
+                        
+                    } else {
+                        bootbox.alert(result.returnMessage);
+                    }
+                } catch (e) {
+                    bootbox.alert("Failed -  " + e);
+                }
+
+                ContinueCallBack();
+
+            }, function (error) {
+
+                FailCallBack(error.toString());
+            })
+        }
+
+        catch (e) {
+
+            FailCallBack(e.toString());
+        }
+    }
+
+    formBase.AddSubTaskClickSetUpInvoice = function (control, ControlInfo, result, ContinueCallBack, FailCallBack) {
+        try {
+
+            formBase.ReturnSubTaskForSetUpInvoice(ControlInfo.userObject.ItemID, function (result) {
+                try {
+
+                    if (result.success) {
+
+                        try {
+                            kWLink.runReport(control.element, result.returnData.targetReportGuid, result.returnData.targetReportPropertiesGuid, 1, null, function (res) { }, null, null)
+                            ContinueCallBack();
+                            result.returnData.targetReportPropertiesGuid
+                        }
+                        catch (e) {
+                            FailCallBack(e);
+                        }
+                    }
+                    else {
+                        bootbox.alert(result.returnMessage);
+                    }
+                } catch (e) {
+                    bootbox.alert("Failed -  " + e);
+                }
+                ContinueCallBack();
+
+            }, function (error) {
+
+                FailCallBack(error.toString());
+            })
+        }
+        catch (e) {
+            FailCallBack(e.toString());
+        }
+    }
+
+
+
+    //Example on after event
+
+   
+   
+        
+        
+    //This is an example of a function that can be applied ot the onLoad of a control for a kWInputCalendar 
+    //and it will then allow you to undertake custom setup and configuration tasks.  To enable this you would
+    //create a HTMLScriptFunctionCustom
+    //formBase.setValidDates = function (control) {
+    //    //This is an example of how to disable dates so they can't be selected
+    //    control.datetimepicker().disabledDates(["4-Jun-2016",
+    //                                            "6-Jun-2016",
+    //                                            "5-Jun-2016"]);
+    //    //for more options on how to modify the dates on the kWInputCalendar see this link
+    //    //http://eonasdan.github.io/bootstrap-datetimepicker/
+    //}
+
+
+    //formBase.ButtonRefreshInnerWithComplexData = function (control) {
+    //    //This will be called by a button press - in this I will create a complex object that I want to transfer back to the 
+    //    //server to be processed by a funciton
+    //    var data = {
+    //        name: "matthew",
+    //        lastName: "van der Linden",
+    //        notes: control.getControl("NewContactNotes", "kWInputText").value(),
+    //        listData : [1,2,3,4]
+    //    }
+    //    this.refreshInnerWithComplexData(data, function (result) {
+    //        //This means we have completed the call to get the data
+    //        alert(result.length + ' - ' + result[1].Firstname);
+    //        });
+    //}
+    //}
+        
+
+        }
+
+    //Standard Class types are
+    //kWInputText
+    //kWLink
+    //kWInputButton
+    //kWFormBase
+    //kWInputCheckBox
+    //kWInputCalendar
+    //kWInputNumber
+    //kWTable
+
+
+

@@ -1,0 +1,468 @@
+Imports kWHTML
+Imports kWHTML.Elements
+Imports WebManagement
+Imports kWHTML.kWForms
+
+Namespace kWatchServer.tskTasks
+    ''' <summary>"
+    ''' Define all custom code for this assembly within this class 
+    ''' </summary>
+    ''' <remarks></remarks>
+    Public Class WEB_tskSetUpInvoice
+        Implements WebForm
+
+#Region "Public variables"
+        Public CSSInclude
+        Public FirstColWidth
+        Private prvMainTaskFormName
+        Private prvTaskCurrentStatus
+#End Region
+
+
+        ' ''' <summary>
+        ' ''' Example - This can be used as a report property - note the <reportProperty>  attribute that has been applied
+        ' ''' </summary>
+        ' ''' <value></value>
+        ' ''' <returns></returns>
+        ' ''' <remarks></remarks>
+        '<reportProperty>
+        'Public Property SiteID As Integer
+        ''' <summary>
+        ''' Main function that is returned to the lines of the report when it is ran
+        ''' </summary>
+        ''' <param name="html"></param>
+        ''' <remarks></remarks>
+        Public Sub GetReport(html As HTMLTextWriterkWatch) Implements WebForm.GetReport
+            Dim repBase = GetReportBase()
+            repBase.ToString(html)
+        End Sub
+        Public Function GetReportBase() As HTMLkWFormBase Implements WebForm.GetReportBase
+            'Create the form base object
+            Dim Form = HTMLkWFormBase.Create(Me)
+            Form.onLoadFormBase = "onLoadFormBase1746"  'make sure this matches the onLoadFormBase name
+            Form.JScript.Add(My.Resources.ClientScript)
+            Form.ShowRefreshButton = True
+            'Add a basic control the main section
+            Form.IncludeHeader = False
+            GetAllControls(Form)
+            Form.ScriptFunctionCallCodeObjectAdd(Function(c) c.ReturnTaskSetUpInvoice(Nothing))
+            Form.ScriptFunctionCallCodeObjectAdd(Function(c) c.ReturnSubTaskForSetUpInvoice(Nothing))
+            Return Form
+        End Function
+        Public Function GetAllControls(form As HTMLkWFormBase(Of WEB_tskSetUpInvoice))
+            Dim TaskNote = kWHTMLElementInputText.Create(Me, Function(c) c.Task_Note)
+            TaskNote.ID = "Task_Note"
+            TaskNote.LabelString = "Note"
+            TaskNote.dataField = "Task_Note"
+            form.FormSectionMain.Add(TaskNote)
+
+            'Dim ResFile = New HTMLText(Res().ToString)
+            'form.FormSectionMain.Add(ResFile)
+            'Dim spacescount = New HTMLText("&nbsp;&nbsp;&nbsp;&nbsp;")
+            'form.FormSectionMain.Add(spacescount)
+
+            Dim TaskStatusAsHTML As New HTMLText(GetTaskCurrentStatus().ToString)
+            form.FormSectionMain.Add("Task Status", New HTMLElementDIV(IsNotReadyReasonTaskCurrentStatus))
+
+            Dim NotesFiless As New HTMLText(NotesFiles().ToString)
+            form.FormSectionMain.Add(NotesFiless)
+
+            Dim GetTaskStepss As New HTMLText(GetTaskSteps().ToString)
+            form.FormSectionMain.Add(GetTaskStepss)
+        End Function
+        Public Function Res()
+            With Me.User.Reports_Definitions.Item_By_Name("HTML_tskTaskGlobal").ClassObject
+                With .CodeObject
+                    .SetDefaults
+                    .Task = Me
+                    .MainTask = MainTask
+                    .IncludeTaskFor = True
+                    .IncludeFollowUp = True
+                    .IncludeTaskContacts = True
+                End With
+
+                Return .EvaluateAsText(False)
+            End With
+        End Function
+        Public Function NotesFiles()
+            With Me.User.Reports_Definitions.Item_By_Name("HTML_tskTaskGlobal").ClassObject
+                With .CodeObject
+                    .SetDefaults
+                    .Task = Me
+                    .MainTask = MainTask
+                    .IncludeNotes = True
+                    .IncludeFiles = True
+                End With
+                Return .EvaluateAsText(False)
+            End With
+        End Function
+
+        Public Function GetTaskCurrentStatus()
+            With Me.User.Reports_Definitions.Item_By_Name("HTML_repManageIsNotReady").ClassObject.CodeObject
+                .SetDefaults
+                .IsNotReadyReasons = TaskCurrentStatus()
+                .CurrentReport = Me
+                'Set the Properties and settings for the report
+                .IsNotReadyReasonSizeLimit = 0
+                .IsNotReadyReasonShowLinks = True
+                .LayoutForTasks = True
+                'Return the results
+                If .IsNotReadyReason IsNot Nothing Then
+                    Return .IsNotReadyReason
+                Else
+                    Return ""
+                End If
+            End With
+        End Function
+        Public Function TaskCurrentStatus()
+            prvTaskCurrentStatus = New kWatchServer.isrNotReadyStates
+            If Me.ReferenceFile Is Nothing Then
+                'This means there is not file here currently
+                prvTaskCurrentStatus.Add(Me.LongID, 200, "No file has been linked - please link the email/letter that was obtained", Me.User)
+            End If
+            Return prvTaskCurrentStatus
+        End Function
+        Public Function IsNotReadyReasonTaskCurrentStatus() As kWTables.kWTable
+            Dim WarnIcon As String
+            Dim ItemIsNotReadyReasonList As New List(Of ClsIsNotReadyReasonTable)
+            WarnIcon = "EventLog_Warning.png"
+            Dim I = 0
+            Dim ArrListTaskStatus = TaskCurrentStatus()
+            For Each Reason In ArrListTaskStatus
+                I += 1
+                If Not Reason.Referance Is Nothing Then
+                    Dim ObjHTML_repManageIsNotReady As New usrUsers.HTML_repManageIsNotReady
+                    ItemIsNotReadyReasonList.Add(New ClsIsNotReadyReasonTable With
+                                             {
+                                             .ID = I,
+                                             .Image = "<IMG Width=16px Height=16px  src='../icons/" & WarnIcon & "'>",
+                                             .ReferenceIcon = "<IMG Width=16px Height=16px  src='../iconsBMP/" & Reason.Referance.Icon & ".bmp'>",
+                                             .Problem = Reason.Reason,
+                                             .ReasonCode = ObjHTML_repManageIsNotReady.GetIsNotReadyName(Reason.Problem),
+                                             .FurtherInfo = Reason.FurtherInformation,
+                                             .PathLink = Reason.Referance.ID
+                                             })
+                End If
+            Next
+            Dim TblIsNotReadyreasonCode = kWHTML.kWTables.kWTable.Create(Me, "TblIsNotReadyreasonCode", ItemIsNotReadyReasonList, "")
+            TblIsNotReadyreasonCode.AddColumn("Image", Function(c) c.Image)
+            TblIsNotReadyreasonCode.AddColumn("", Function(c) c.ReferenceIcon)
+            TblIsNotReadyreasonCode.AddColumn("Problem", Function(c) c.Problem)
+            TblIsNotReadyreasonCode.AddColumn("ReasonCode", Function(c) c.ReasonCode)
+            TblIsNotReadyreasonCode.AddColumn("FurtherInfo", Function(c) c.FurtherInfo)
+            TblIsNotReadyreasonCode.AddColumn("Open Task", Function(c) New HTMLElementDIV(OpenTaskTable(c.PathLink)))
+            'OpenTask
+            Return TblIsNotReadyreasonCode
+        End Function
+        Public Function OpenTaskTable(id) As HTMLElementDIV
+            Dim DivOpenTable As New HTMLElementDIV
+            Dim BtnOpenTask = kWHTMLElementButton.Create(Me, "BtnOpenTask")
+            Dim props As Object = New Dynamic.ExpandoObject
+            props.ItemID = id
+            BtnOpenTask.userObject = props
+            BtnOpenTask.ButtonText.Text = " <i class='fas fa-file-code'></i> "
+            BtnOpenTask.ButtonStyle = kWHTMLElementButton.buttonStyles.nothing
+            BtnOpenTask.onClickEvent.onAfterTriggerFunctionName = "OpenTaskSetUpInvoice"
+            DivOpenTable.Controls.Add(BtnOpenTask)
+            Return DivOpenTable
+        End Function
+        Public Function ReturnTaskSetUpInvoice(id) As kWControlEventReturnInfo
+            Try
+                If id IsNot Nothing Then
+                    Dim tsk As tskTask = Me.User.Get_Item_Object("57~" & id).ClassObject
+                    Dim ReportInfo As Object = New Dynamic.ExpandoObject
+                    ReportInfo.targetReportGuid = CType(tsk.Reports_Definitions.Item_By_Name("LOCALHTML_" & TypeName(tsk)).ClassObject, defRun_Report_Definition).RunReportGUID ' "43567d47-b760-4c5a-b527-b9b702540a19"
+                    ReportInfo.targetReportPropertiesGuid = Nothing '"{}"
+                    Return New kWControlEventReturnInfo With {.success = True, .returnData = ReportInfo}
+                Else
+                    Return New kWControlEventReturnInfo With {.success = False, .returnMessage = "We Do Not Find Task ID Related To This file "}
+                End If
+            Catch ex As Exception
+                Return New kWControlEventReturnInfo With {.success = False, .returnMessage = "Failed Due To:" & ex.Message.ToString}
+            End Try
+        End Function
+        Public Function ReturnSubTaskForSetUpInvoice(id) As kWControlEventReturnInfo
+            Try
+                If id IsNot Nothing Then
+                    Dim Rep As tskTask = Me.User.Get_Item_Object("57~" & id).ClassObject
+                    Dim ReportInfo As Object = New Dynamic.ExpandoObject
+                    ReportInfo.targetReportGuid = CType(Rep.SubTasks.Reports_Definitions.Item_By_Name("LOCALHTMLADD_KWItems").ClassObject, defRun_Report_Definition).RunReportGUID ' "43567d47-b760-4c5a-b527-b9b702540a19"
+                    ReportInfo.targetReportPropertiesGuid = Nothing
+                    Return New kWControlEventReturnInfo With {.success = True, .returnData = ReportInfo}
+                Else
+                    Return New kWControlEventReturnInfo With {.success = False, .returnMessage = "We Do Not ID Related To This file "}
+                End If
+            Catch ex As Exception
+                Return New kWControlEventReturnInfo With {.success = False, .returnMessage = "Failed Due To:" & ex.Message.ToString}
+            End Try
+        End Function
+        Public Function GetTaskSteps()
+            If Me.SubTasks.Count > 0 Then
+                Return Me.Reports_Definitions.Item_By_Name(CStr(prvMainTaskFormName)).ClassObject.CodeObject.GetTaskSteps
+            Else
+                Return "<SPAN ID=SubTasksSpan>There are no Sub tasks  " & AddSubTask(Me.ID).ToString
+            End If
+        End Function
+        Public Function AddSubTask(IDfor) As HTMLElementDIV
+            Dim DivNewTask As New HTMLElementDIV
+            Dim SubTask = kWHTMLElementButton.Create(Me, "SubTask")
+            SubTask.ID = "SubTask"
+            Dim props As Object = New Dynamic.ExpandoObject
+            props.ItemID = IDfor
+            SubTask.userObject = props
+            SubTask.ButtonText.Text = "Add Sub Task "
+            SubTask.ButtonStyle = kWHTMLElementButton.buttonStyles.nothing
+            SubTask.onClickEvent.onAfterTriggerFunctionName = "AddSubTaskClickSetUpInvoice"
+            DivNewTask.Controls.Add(SubTask)
+            Return DivNewTask
+        End Function
+        Public Function GetTaskCurrentStatus_Testing()
+            With Me.User.Reports_Definitions.Item_By_Name("HTML_repManageIsNotReady").ClassObject.CodeObject
+                .SetDefaults
+                .IsNotReadyReasons = TaskCurrentStatus()
+                .CurrentReport = Me
+                'Set the Properties and settings for the report
+                .IsNotReadyReasonSizeLimit = 0
+                .IsNotReadyReasonShowLinks = True
+                .LayoutForTasks = True
+                'Return the results
+                Return .IsNotReadyReason
+            End With
+        End Function
+        ''' <summary>
+        ''' This is the function that is called when you need to refresh the form base object
+        ''' </summary>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Function RefreshFormBase() As String Implements WebForm.RefreshFormBase
+            'Get the report
+            Dim repBase As HTMLkWFormBase(Of WEB_tskSetUpInvoice) = GetReportBase()
+            'This will exclude the jscript code and other items
+            repBase.RefreshPageCall = True
+            Dim html As New HTMLTextWriterkWatch
+            repBase.ToString(html)
+            'Return the string that contains the main contents of this report with extras
+            Return html.ToString
+        End Function
+
+#Region "Default Code"
+
+        <ThreadStatic()>
+        Public Shared SharedMe As WEB_tskSetUpInvoice
+
+        'Private _Entities As Entities
+        '''' <summary>
+        '''' This should only be used when updating properties, not in any other code - when you need the entities you should
+        '''' create it yourself
+        '''' </summary>
+        '''' <value></value>
+        '''' <returns></returns>
+        '''' <remarks></remarks>
+        'Public ReadOnly Property Entities As Entities
+        '    Get
+        '        If Not _Entities Is Nothing Then
+        '            If _Entities.IsDisposed Then
+        '                _Entities = Nothing
+        '            End If
+        '        End If
+        '        If _Entities Is Nothing Then
+        '            _Entities = New Entities(Me.User)
+        '        End If
+
+        '        Return _Entities
+        '    End Get
+        'End Property
+
+        ''' <summary>
+        ''' This can be used to associate an icon with this report that is different to the underlying report
+        ''' You could set this within the SetDefaults, or you could create a get and set componet of the 
+        ''' property and override it
+        ''' </summary>
+        ''' <returns></returns>
+        Public Property ReportIcon As Icons Implements WebForm.ReportIcon
+
+        ''' <summary>
+        ''' Initialization code in here for this report.  This code will be called each time the report is ran
+        ''' other call reports should also call this before using the report output or any contained functions
+        ''' </summary>
+        ''' <remarks></remarks>
+        Public Sub SetDefaults() Implements defReport_Definitions.defReportDefinitionBase.SetDefaults
+            'Uncomment these lines if you have an entitites object
+            'If Not _Entities Is Nothing Then
+            '    _Entities.Dispose()
+            '    _Entities = Nothing
+            'End If
+            'ItemReferance = User.Get_Item_Object(Me.LongID).ClassObject
+            CSSInclude = True
+            FirstColWidth = ""
+            prvMainTaskFormName = Me.User.Reports_Definitions.Item_By_Name("HTML_tskTaskGlobal").ClassObject.CodeObject.MainTaskFormName
+
+            SharedMe = Me
+        End Sub
+
+        ''' <summary>
+        ''' This is a callback that is called after the report if produced.  The report is a document of type Word, Excel, Email or RTF
+        ''' This depends on the type of report produced
+        ''' </summary>
+        ''' <param name="ReportObj">The Report object</param>
+        ''' <remarks></remarks>
+        Public Sub AfterReportProduce(ByVal ReportObj As Object) Implements defReport_Definitions.defReportDefinitionBase.AfterReportProduce
+        End Sub
+
+        ''' <summary>
+        ''' The callback is called after the file has been saved to kWatch.  The file object is a referances to the filFile object that has 
+        ''' just been saved
+        ''' </summary>
+        ''' <param name="File">The newly saved file</param>
+        ''' <remarks></remarks>
+        Public Sub AfterFileSave(ByVal File As kWatchServer.filFile) Implements defReport_Definitions.defReportDefinitionBase.AfterFileSave
+        End Sub
+
+
+        ''' <summary>
+        ''' This is the web request object that has been passed back from the originating call. This contains
+        ''' information relating to the browser, the call been made and the IIS server that the call came from.
+        ''' This is a copy of the request object that is generated by the server 
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Property Request As UserRequest Implements WebForm.Request
+
+        ''' <summary>
+        ''' This is the WebSite that this request belongs to
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Property Web As webWebSite Implements WebForm.Web
+
+        ''' <summary>
+        ''' This is the webContact that relatest to this request
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Property WebContact As webContactLogin Implements WebForm.WebContact
+
+#Region "Settings"
+
+        ''' <summary>
+        ''' This will return the settings object as a dynamic expando object that you can review and edit.  If you
+        ''' want your settings object casted to a specific type, use the GetSettings function.  Setting an object
+        ''' to this location will also update the settings object for you as well
+        ''' 
+        ''' This will get the settings object for this report object.  Settings objects are unique based on
+        ''' the RunReportID, LoggedInContact (either web or local), The active WebID or web site, a DashboardwidgetID and
+        ''' optionaly a SettingsLocationID that you might choose to use.
+        ''' 
+        ''' So for a kWatch report delivered within kWatch - this would be unique based on RunReportID and contactID only as
+        ''' webID, DashboardwidgetID and SettinglocationID are all nothing
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Property Settings As Object Implements WebForm.Settings
+            Get
+                Return WebManagement.SettingsManagement.GetSettings(Me) ' Newtonsoft.Json.JsonConvert.DeserializeObject(Of ExpandoObject)(Me.SettingsRecord.SettingsObject)
+            End Get
+            Set(value As Object)
+                WebManagement.SettingsManagement.SaveSettings(value, Me)
+            End Set
+        End Property
+
+        ''' <summary>
+        ''' This will return the settings object as a dynamic expando object that you can review and edit.  If you
+        ''' want your settings object casted to a specific type, use the GetSettings function.  Setting an object
+        ''' to this location will also update the settings object for you as well
+        ''' 
+        ''' This will get the settings object for this report object.  Settings objects are unique based on
+        ''' the RunReportID, LoggedInContact (either web or local), The active WebID or web site, a DashboardwidgetID and
+        ''' optionaly a SettingsLocationID that you might choose to use.
+        ''' 
+        ''' So for a kWatch report delivered within kWatch - this would be unique based on RunReportID and contactID only as
+        ''' webID, DashboardwidgetID and SettinglocationID are all nothing
+        ''' </summary>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Function GetSettings(Of SettingObjectType)() As SettingObjectType Implements WebForm.GetSettings
+
+            Return WebManagement.SettingsManagement.GetSettings(Of SettingObjectType)(Me)
+
+        End Function
+
+        ''' <summary>
+        ''' This will save the settings object to the database
+        ''' </summary>
+        ''' <typeparam name="SettingObjectType"></typeparam>
+        ''' <param name="Obj"></param>
+        ''' <remarks></remarks>
+        Public Sub SaveSettings(Of SettingObjectType)(Obj As SettingObjectType) Implements WebForm.SaveSettings
+
+            WebManagement.SettingsManagement.SaveSettings(Obj, Me)
+
+        End Sub
+
+        ''' <summary>
+        ''' This is a global property that if set - will be used as a reportProperties object by the dash-board component
+        ''' You do not need to set this - and it is set if this report is used as 
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        <kWHTML.kWForms.reportProperty>
+        Public Property DashboardWidgetID As Integer? Implements WebForm.DashboardWidgetID
+        ''' <summary>
+        ''' This will get the settings record for this report object.  Settings objects are created and unique based on
+        ''' the RunReportID, LoggedInContact (either web or local), The active WebID or web site, a dash-board Widget ID and
+        ''' optionaly a SettingsLocationID that you might choose to use.
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public ReadOnly Property SettingsRecord As defReportSetting Implements WebForm.SettingsRecord
+            Get
+                Return WebManagement.SettingsManagement.GetSettingsRecord(Me)
+            End Get
+        End Property
+
+
+        ''' <summary>
+        ''' This will return the guid that is used within the report object
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public ReadOnly Property ReportPropertiesGuid As Guid Implements WebForm.ReportPropertiesGuid
+            Get
+                Return WebManagement.SettingsManagement.getReportPropertiesGuid(Me)
+            End Get
+        End Property
+
+        ''' <summary>
+        ''' This wil return the report properties object for this report
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public ReadOnly Property ReportProperties As Object Implements WebForm.ReportProperties
+            Get
+                Return WebManagement.SettingsManagement.GetReportProperties(Me)
+            End Get
+        End Property
+#End Region
+
+#End Region
+        Public Class ClsIsNotReadyReasonTable
+            Public Property ID As Integer
+            Public Property Image
+            Public Property ReferenceIcon
+            Public Property Problem
+            Public Property ReasonCode
+            Public Property FurtherInfo
+            Public Property PathLink
+            Public Property OpenTaskBtn()
+        End Class
+
+    End Class
+End NameSpace

@@ -1,0 +1,387 @@
+Imports kWGlobalFunctions.kWGlobalsShared
+Imports kWHTML
+Imports kWHTML.kWTables
+Imports kWHTML.Elements
+Imports WebManagement
+Imports kWHTML.kWForms
+
+Namespace kWatchServer.repReports
+    ''' <summary>"
+    ''' Define all custom code for this assembly within this class 
+    ''' </summary>
+    ''' <remarks></remarks>
+    Public Class WEB_SiteSavings
+        Implements WebForm
+
+#Region "Variables"
+        Private prvTotalUsage
+        Public AverageUsage
+        Public AverageCharge
+        Private prvFinancialYearChargesHistory
+        Private prvFinancialYearUsageHistory
+        Private prvFinancialYearSavingsHistory
+        Private prvGetUsageHistory
+        Private prvGetChargeHistory
+        Private HasQSMMeter
+
+#End Region
+
+#Region "Form(Page) & Load Methods"
+        ''' <summary>
+        ''' Main function that is returned to the lines of the report when it is ran
+        ''' </summary>
+        ''' <param name="html"></param>
+        ''' <remarks></remarks>
+        Public Sub GetReport(html As HTMLTextWriterkWatch) Implements WebForm.GetReport
+            Dim repBase = GetReportBase()
+            repBase.ToString(html)
+        End Sub
+
+        Public Function GetReportBase() As HTMLkWFormBase Implements WebForm.GetReportBase
+
+            Dim Form = HTMLkWFormBase.Create(Me)
+            Form.onLoadFormBase = "onLoadFormBase1592"  'make sure this matches the onLoadFormBase name
+            Form.FormHeader.FormName = "Savings"
+            Dim HeaderText = New HTMLText("Detailed below are the savings identified on your electricity account to date.")
+            Form.FormSectionMain.Add(HeaderText)
+            Form.JScript.Add(My.Resources.ClientScript)
+            '  GetSavingsDetails(Nothing)
+            Form.FormSectionMain.Add(GetSavingsSummary())
+            Return Form
+        End Function
+        ''' <summary>
+        ''' This is the function that is called when you need to refresh the form base object
+        ''' </summary>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Function RefreshFormBase() As String Implements WebForm.RefreshFormBase
+
+            'Get the report
+            Dim repBase As HTMLkWFormBase(Of WEB_SiteSavings) = GetReportBase()
+            'This will exclude the jscript code and other items
+            repBase.RefreshPageCall = True
+            Dim html As New HTMLTextWriterkWatch
+            repBase.ToString(html)
+            'Return the string that contains the main contents of this report with extras
+            Return html.ToString
+
+        End Function
+#End Region
+
+#Region "Call Report & Calculations"
+        Public Function GetSavingsDetails(rep) As HTMLElementDIV
+            Dim ComparisonDiv As New HTMLElementDIV
+            ' Dim Reprt = Me.ReportItems.ClassObject
+            Dim Comparision = Me.User.Get_Item_Object(utlClassType.utlClassTyperepReportItem & "~" & Me.ReportItems.ItemIDString, True).ClassObject
+            ComparisonDiv.Controls.Add(Comparision)
+            Return ComparisonDiv
+        End Function
+
+        Public Function GetPastSavingsDetails(RepDesItem) As String
+            If RepDesItem Is Nothing Then Return ""
+            If Not RepDesItem.ReportItemNewest Is Nothing Then
+                With RepDesItem.ReportItemNewest
+                    GetPastSavingsDetails = "<TABLE Width=100% Border=1  STYLE=""Border:thin solid black"">" & vbCrLf _
+                        & "<TR>" & vbCrLf _
+                            & "<TD ColSpan=3><H4>" & .EvaluateItemName & "</H4></TD>" & vbCrLf _
+                        & "</TR>" & vbCrLf _
+                        & "<TR>" & vbCrLf _
+                            & "<TD Width=10%></TD>" & vbCrLf _
+                            & "<TD ColSpan=2><P>" & .EvaluateItemDescription & "<BR>" & vbCrLf _
+                            & "	This saving was identified on the " & Format(.ReportDesignItem.SDate, "dd-mmm-yyyy") & " and continued to " & Format(.ReportDesignItem.EDate, "dd-mmm-yyyy") & "</P></TD>" & vbCrLf _
+                        & "</TR>" & vbCrLf _
+                        & "<TR>" & vbCrLf _
+                            & "<TD ColSpan=2><H4>Total Saving</H4></TD>" & vbCrLf _
+                            & "<TD Width=20% Align=right><H4>" & FormatCurrency(RepDesItem.SavingsCachedToDate) & "</H4></TD>" & vbCrLf _
+                        & "</TR>" & vbCrLf _
+                    & "</TABLE>" & vbCrLf
+                End With
+            Else
+                Return "Unable to obtain referance to latest report - please contact Utilacor"
+            End If
+        End Function
+        Public Function GetSavingsSummary() As kWTable
+            Dim Item
+            Dim Include
+            Dim Rep
+            For Each Item In Me.ReportDesign.ReportDesignItems
+                Item = Item.ClassObject
+                If Item.IsMinFeeItem = False Then
+                    Rep = Nothing
+                    For Each Rep In Me.ReportItems
+                        Rep = Rep.ClassObject
+                        If Rep.ReportDesignITem Is Item Then
+                            Exit For
+                        End If
+                    Next
+                    If Rep IsNot Nothing Then
+                        Dim Savingitemlist = New List(Of CustomerSavingslist)
+                        Dim Savingfor = "Saving For" & " " & Format(Me.StartDate, "yyyy")
+                        Savingitemlist.Add(New CustomerSavingslist With {.icon = "", .ID = Rep.ID, .Name = Rep.Name, .SavingFor = Rep.SavingsCached, .SavingTo = Rep.SavingsCachedToDate})
+                        Dim SavingTable = kWTable.Create(Me, "SavingTable", Savingitemlist, "GetSavingsSummary", onGetSubTableEventDelegate:=
+                                       Function(ControlInfo, Obj)
+                                           Return New HTMLElementDIV(GetSavingsDetails(Rep))
+                                       End Function)
+                        SavingTable.AddColumn("", Function(c) c.icon)
+                        SavingTable.AddColumn("ID", Function(c) c.ID)
+                        SavingTable.AddColumn("Name", Function(c) c.Name)
+                        SavingTable.AddColumn(Savingfor, Function(c) c.SavingFor)
+                        SavingTable.AddColumn("Saving To Date", Function(c) c.SavingTo)
+
+                        '   Dim Comparionreport = Rep.Reports_Definitions.Item_By_Name(Rep.ReportDesignItem.Report_Definition.Name).ClassObject
+                        Return SavingTable
+                    Else
+                        Include = False
+                        'This means that there is no report item in this report period - we will need to see if it relates to past periods - THe only
+                        'Way this is possible is if it has already ended prior to this report period (or something else is wrong)
+                        If Item.EDate IsNot Nothing Then
+                            If Item.EDate < Me.EndDate Then
+                                If Item.SavingsCachedToDate <> 0 Or True Then
+                                    Include = True
+                                End If
+                            End If
+                        End If
+
+                        If Include Then
+                            Dim itemlist = New List(Of CustomerSavingslist)
+                            itemlist.Add(New CustomerSavingslist With {.icon = "", .ID = Item.ID, .Name = Item.Name, .SavingTo = Item.SavingsCachedToDate})
+                            Dim ItamTable = kWTable.Create(Me, "SavingTable", itemlist, onGetSubTableEventDelegate:=
+                                       Function(ControlInfo, Obj)
+                                           Return New HTMLElementDIV(GetPastSavingsDetails(Item))
+                                       End Function)
+                            ItamTable.AddColumn("", Function(c) c.icon)
+                            ItamTable.AddColumn("ID", Function(c) c.ID)
+                            ItamTable.AddColumn("Name", Function(c) c.Name)
+                            ItamTable.AddColumn(FormatCurrency(Me.SavingsCached), Function(c) Nothing)
+                            ItamTable.AddColumn(FormatCurrency(Me.SavingsCachedToDate), Function(c) c.SavingTo)
+                            Return ItamTable
+                        End If
+                    End If
+                End If
+            Next
+
+        End Function
+
+#End Region
+
+#Region "Default Code"
+
+        <ThreadStatic()>
+        Public Shared SharedMe As WEB_SiteSavings
+
+        'Private _Entities As Entities
+        '''' <summary>
+        '''' This should only be used when updating properties, not in any other code - when you need the entities you should
+        '''' create it yourself
+        '''' </summary>
+        '''' <value></value>
+        '''' <returns></returns>
+        '''' <remarks></remarks>
+        'Public ReadOnly Property Entities As Entities
+        '    Get
+        '        If Not _Entities Is Nothing Then
+        '            If _Entities.IsDisposed Then
+        '                _Entities = Nothing
+        '            End If
+        '        End If
+        '        If _Entities Is Nothing Then
+        '            _Entities = New Entities(Me.User)
+        '        End If
+
+        '        Return _Entities
+        '    End Get
+        'End Property
+
+        ''' <summary>
+        ''' This can be used to associate an icon with this report that is different to the underlying report
+        ''' You could set this within the SetDefaults, or you could create a get and set componet of the 
+        ''' property and override it
+        ''' </summary>
+        ''' <returns></returns>
+        Public Property ReportIcon As Icons Implements WebForm.ReportIcon
+
+        ''' <summary>
+        ''' Initialization code in here for this report.  This code will be called each time the report is ran
+        ''' other call reports should also call this before using the report output or any contained functions
+        ''' </summary>
+        ''' <remarks></remarks>
+        Public Sub SetDefaults() Implements defReport_Definitions.defReportDefinitionBase.SetDefaults
+            'Uncomment these lines if you have an entitites object
+            'If Not _Entities Is Nothing Then
+            '    _Entities.Dispose()
+            '    _Entities = Nothing
+            'End If
+
+            SharedMe = Me
+        End Sub
+
+        ''' <summary>
+        ''' This is a callback that is called after the report if produced.  The report is a document of type Word, Excel, Email or RTF
+        ''' This depends on the type of report produced
+        ''' </summary>
+        ''' <param name="ReportObj">The Report object</param>
+        ''' <remarks></remarks>
+        Public Sub AfterReportProduce(ByVal ReportObj As Object) Implements defReport_Definitions.defReportDefinitionBase.AfterReportProduce
+        End Sub
+
+        ''' <summary>
+        ''' The callback is called after the file has been saved to kWatch.  The file object is a referances to the filFile object that has 
+        ''' just been saved
+        ''' </summary>
+        ''' <param name="File">The newly saved file</param>
+        ''' <remarks></remarks>
+        Public Sub AfterFileSave(ByVal File As kWatchServer.filFile) Implements defReport_Definitions.defReportDefinitionBase.AfterFileSave
+        End Sub
+
+
+        ''' <summary>
+        ''' This is the web request object that has been passed back from the originating call. This contains
+        ''' information relating to the browser, the call been made and the IIS server that the call came from.
+        ''' This is a copy of the request object that is generated by the server 
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Property Request As UserRequest Implements WebForm.Request
+
+        ''' <summary>
+        ''' This is the WebSite that this request belongs to
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Property Web As webWebSite Implements WebForm.Web
+
+        ''' <summary>
+        ''' This is the webContact that relatest to this request
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Property WebContact As webContactLogin Implements WebForm.WebContact
+
+#Region "Settings"
+
+        ''' <summary>
+        ''' This will return the settings object as a dynamic expando object that you can review and edit.  If you
+        ''' want your settings object casted to a specific type, use the GetSettings function.  Setting an object
+        ''' to this location will also update the settings object for you as well
+        ''' 
+        ''' This will get the settings object for this report object.  Settings objects are unique based on
+        ''' the RunReportID, LoggedInContact (either web or local), The active WebID or web site, a DashboardwidgetID and
+        ''' optionaly a SettingsLocationID that you might choose to use.
+        ''' 
+        ''' So for a kWatch report delivered within kWatch - this would be unique based on RunReportID and contactID only as
+        ''' webID, DashboardwidgetID and SettinglocationID are all nothing
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Property Settings As Object Implements WebForm.Settings
+            Get
+                Return WebManagement.SettingsManagement.GetSettings(Me) ' Newtonsoft.Json.JsonConvert.DeserializeObject(Of ExpandoObject)(Me.SettingsRecord.SettingsObject)
+            End Get
+            Set(value As Object)
+                WebManagement.SettingsManagement.SaveSettings(value, Me)
+            End Set
+        End Property
+
+        ''' <summary>
+        ''' This will return the settings object as a dynamic expando object that you can review and edit.  If you
+        ''' want your settings object casted to a specific type, use the GetSettings function.  Setting an object
+        ''' to this location will also update the settings object for you as well
+        ''' 
+        ''' This will get the settings object for this report object.  Settings objects are unique based on
+        ''' the RunReportID, LoggedInContact (either web or local), The active WebID or web site, a DashboardwidgetID and
+        ''' optionaly a SettingsLocationID that you might choose to use.
+        ''' 
+        ''' So for a kWatch report delivered within kWatch - this would be unique based on RunReportID and contactID only as
+        ''' webID, DashboardwidgetID and SettinglocationID are all nothing
+        ''' </summary>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Function GetSettings(Of SettingObjectType)() As SettingObjectType Implements WebForm.GetSettings
+
+            Return WebManagement.SettingsManagement.GetSettings(Of SettingObjectType)(Me)
+
+        End Function
+
+        ''' <summary>
+        ''' This will save the settings object to the database
+        ''' </summary>
+        ''' <typeparam name="SettingObjectType"></typeparam>
+        ''' <param name="Obj"></param>
+        ''' <remarks></remarks>
+        Public Sub SaveSettings(Of SettingObjectType)(Obj As SettingObjectType) Implements WebForm.SaveSettings
+
+            WebManagement.SettingsManagement.SaveSettings(Obj, Me)
+
+        End Sub
+
+        ''' <summary>
+        ''' This is a global property that if set - will be used as a reportProperties object by the dash-board component
+        ''' You do not need to set this - and it is set if this report is used as 
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        <kWHTML.kWForms.reportProperty>
+        Public Property DashboardWidgetID As Integer? Implements WebForm.DashboardWidgetID
+        ''' <summary>
+        ''' This will get the settings record for this report object.  Settings objects are created and unique based on
+        ''' the RunReportID, LoggedInContact (either web or local), The active WebID or web site, a dash-board Widget ID and
+        ''' optionaly a SettingsLocationID that you might choose to use.
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public ReadOnly Property SettingsRecord As defReportSetting Implements WebForm.SettingsRecord
+            Get
+                Return WebManagement.SettingsManagement.GetSettingsRecord(Me)
+            End Get
+        End Property
+
+
+        ''' <summary>
+        ''' This will return the guid that is used within the report object
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public ReadOnly Property ReportPropertiesGuid As Guid Implements WebForm.ReportPropertiesGuid
+            Get
+                Return WebManagement.SettingsManagement.getReportPropertiesGuid(Me)
+            End Get
+        End Property
+
+        ''' <summary>
+        ''' This wil return the report properties object for this report
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public ReadOnly Property ReportProperties As Object Implements WebForm.ReportProperties
+            Get
+                Return WebManagement.SettingsManagement.GetReportProperties(Me)
+            End Get
+        End Property
+#End Region
+
+
+
+
+#End Region
+
+
+
+    End Class
+
+    Class CustomerSavingslist
+
+        Public Property icon As String
+        Public Property ID As String
+        Public Property Name As String
+        Public Property SavingFor As String
+        Public Property SavingTo As String
+    End Class
+End Namespace

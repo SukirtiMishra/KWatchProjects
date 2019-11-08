@@ -1,0 +1,14 @@
+"""""""""""""""""Space Count Function
+
+Private Function CreateRowDiv(str As String, val As String, className As String) As HTMLElementDIV
+            Dim mainDiv As New HTMLElementDIV("", "", "row")
+            Dim textDiv As New HTMLElementDIV("", "", className)
+            textDiv.SetInnerText(str)
+            textDiv.AddStyleAttribute("margin", "0")
+            Dim valDiv As New HTMLElementDIV("", "", className)
+            valDiv.SetInnerText(val)
+            valDiv.AddStyleAttribute("margin", "0")
+            mainDiv.Controls.Add(textDiv)
+            mainDiv.Controls.Add(valDiv)
+            Return mainDiv
+        End Function

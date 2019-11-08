@@ -1,0 +1,275 @@
+
+//Add custom code to the form base goes right here - this is where you add custom functions that you need
+//to add to the form base object
+function onLoadFormBase1576(formBase) {
+
+    formBase.toggleCodeSelection = function (control, ControlInfo, result, ContinueCallBack, FailCallBack) {
+        var OfficeID = formBase.getControl("OfficeList").value();
+
+        var LongID = formBase.getControl("IssuedTo").value();
+
+        formBase.GetFilterSection(LongID, OfficeID, function (result) {
+            try {
+                if (result.success) {
+
+                    var FilterSectionDIV2 = $(control.formBase().element).find("#InvoiceDiv");
+
+                    FilterSectionDIV2.html(result.returnData);
+
+                } else {
+                    bootbox.alert(result.returnMessage);
+                }
+            } catch (e) {
+                bootbox.alert("Failed -  " + e);
+            }
+            ContinueCallBack();
+        }, function (error) {
+            bootbox.alert(error);
+            FailCallBack(error.toString());
+        });
+
+
+        formBase.GetInvoiceMasterCategoriesReturn(OfficeID, function (result) {
+            try {
+                if (result.success) {
+
+                    var FilterSectionDIV2 = $(control.formBase().element).find("#Invoicecategory");
+
+                    FilterSectionDIV2.html(result.returnData);
+
+                } else {
+                    bootbox.alert(result.returnMessage);
+                }
+            } catch (e) {
+                bootbox.alert("Failed -  " + e);
+            }
+            ContinueCallBack();
+        }, function (error) {
+            bootbox.alert(error);
+            FailCallBack(error.toString());
+        });
+
+        ContinueCallBack()
+    }
+
+    formBase.GetMasterCategories = function (control, ControlInfo, result, ContinueCallBack, FailCallBack) {
+
+        var MasterCategory = formBase.getControl("MasterCategoryIDS").value();
+
+        formBase.GetCategoriesHtml(MasterCategory, function (result) {
+
+            try {
+
+                if (result.success) {
+                    var FilterSectionDIV1 = $(control.formBase().element).find("#InvoiceDivSubCategory")
+                    FilterSectionDIV1.html(result.returnData)
+
+
+                } else {
+
+                    bootbox.alert(result.returnMessage)
+                }
+            } catch (e) {
+                bootbox.alert("Failed -  " + e)
+            }
+            ContinueCallBack()
+        }, function (error) {
+            bootbox.alert(error);
+            FailCallBack(error.toString());
+        })
+        ContinueCallBack()
+    }
+
+    formBase.Invoicefromspecify = function (control, ControlInfo, result, ContinueCallBack, FailCallBack) {
+
+        var LongID = formBase.getControl("IssuedTo").value();
+        var Invoicefromvalue = formBase.getControl("InvFromAsPaidTo").value();
+
+        formBase.InvoiceDivHideShow(LongID, Invoicefromvalue, function (result) {
+
+            try {
+
+                if (result.success) {
+                    var FilterSectionDIV5 = $(control.formBase().element).find("#InvoiceFromDrp")
+                    FilterSectionDIV5.html(result.returnData)
+                } else {
+                    bootbox.alert(result.returnMessage)
+                }
+            } catch (e) {
+                bootbox.alert("Failed -  " + e)
+            }
+            ContinueCallBack()
+        }, function (error) {
+            bootbox.alert(error);
+            FailCallBack(error.toString());
+        })
+        ContinueCallBack()
+    }
+
+    formBase.AddPaymentAccount = function (control, ControlInfo, result, ContinueCallBack, FailCallBack) {
+
+        var LongID = formBase.getControl("IssuedTo").value();
+
+        formBase.AddPaymentAccount(LongID, function (result) {
+            try {
+
+                if (result.success) {
+                    var NewPaymentAccountID = result.returnDataAddPaymentAccountScript
+                    formBase.toggleCodeSelection(control, ControlInfo, result, ContinueCallBack, FailCallBack);
+                    this.getControl("PaymentAccountID").value(NewPaymentAccountID);
+
+                } else {
+
+                    bootbox.alert(result.returnMessage)
+                }
+            } catch (e) {
+                bootbox.alert("Failed -  " + e)
+            }
+            ContinueCallBack()
+        }, function (error) {
+            bootbox.alert(error);
+            FailCallBack(error.toString());
+        })
+        ContinueCallBack()
+    }
+
+    formBase.BeforeAddClick = function (control, ControlInfo, continueCallBack, failCallBack) {
+
+        try {
+            var PaymentAccountID=0
+            var categoryid;
+            var _GetInvoiceFromID = "";
+            var InvoiceFrom = formBase.getControl("InvFromAsPaidTo").value();
+            var IssuedTo = ""
+            if (InvoiceFrom == "Default") {
+                _GetInvoiceFromID = formBase.getControl("IssuedTo").value()
+
+            }
+            else {
+                //InvFromAsPaidTo
+
+                _GetInvoiceFromID = formBase.getControl("SpecifyDrp").value();
+
+            }
+
+
+            if (formBase.getControl("MasterCategoryIDS").value() > 0) {
+                categoryid = formBase.getControl("CategoryID").value();
+
+            }
+            else {
+                categoryid = 0;
+            }
+            if (formBase.getControl("PaymentAccountID").value() > 0) {
+                PaymentAccountID = formBase.getControl("PaymentAccountID").value();
+            }
+
+
+            ControlInfo.userObject = {
+                LongID: formBase.getControl("IssuedTo").value(),
+                MasterCategoryID: formBase.getControl("MasterCategoryIDS").value(),
+                Amount: formBase.getControl("Amount").value(),
+                IssuedTo: formBase.getControl("IssuedTo").value(),
+                InvoiceFrom: formBase.getControl("InvFromAsPaidTo").value(),
+                InvoiceFromID: _GetInvoiceFromID,
+                PaymentAccountID:PaymentAccountID   ,// formBase.getControl("PaymentAccountID").value()
+                GSTCode: formBase.getControl("GSTCode").value(),
+                DateDue: formBase.getControl("DateDue").value(),
+                IssueDate: formBase.getControl("IssueDate").value(),
+                CategoryID: categoryid,
+                OfficeID: formBase.getControl("OfficeList").value(),
+                InvoiceDetails: formBase.getControl("InvoiceDetails").value()
+            };
+
+            continueCallBack();
+
+        }
+        catch (e) {
+            bootbox.alert("There was an error in the code", failCallBack());
+        }
+    }
+
+    formBase.AfterAddClick = function (control, ControlInfo, result, ContinueCallBack, FailCallBack) {
+        try {
+            if (result.success) {
+                formBase.getControl("Amount").value("0");
+                formBase.getControl("InvFromAsPaidTo").value(0);
+                formBase.getControl("InvoiceDetails").value(0)
+
+                var FilterSectionDIV5 = $(control.formBase().element).find("#InvoiceFromDrp")
+                FilterSectionDIV5.html(result.returnData)
+                bootbox.alert(result.returnMessage)
+
+
+                if (formBase.getControl("OpenItem").value() == true) {
+                    try {
+                        kWLink.runReport(control.element, result.returnData.targetReportGuid, result.returnData.targetReportPropertiesGuid, 1, null, function (res) { }, null, null)
+
+                        if (result.returnMessage) {
+                            bootbox.alert(result.returnMessage, function () { CloseBrowser() })
+                        } else {
+                            CloseBrowser()
+                        }
+                        ContinueCallBack();
+                    }
+                    catch (e) {
+                        FailCallBack(e);
+                    }
+                }
+                else {
+
+                    if (result.returnMessage) {
+                        bootbox.alert(result.returnMessage, function () { CloseBrowser() })
+                    } else {
+                        CloseBrowser()
+                    }
+
+                    ContinueCallBack();
+
+                }
+
+            }
+            else {
+                bootbox.alert(result.returnMessage);
+                ContinueCallBack();
+            }
+        }
+
+        catch (e) {
+            FailCallBack(e);
+        }
+
+    }
+
+    formBase.GetMasterSubCategory = function (control, ControlInfo, result, ContinueCallBack, FailCallBack) {
+        var MasterCategory = formBase.getControl("MasterCatagories").value();
+        formBase.GetCategoriesList(MasterCategory, function (result) {
+            try {
+                if (result.success) {
+                    var FilterSectionDIV1 = $(control.formBase().element).find("#InvoiceFromDrpReturn")
+                    FilterSectionDIV1.html(result.returnData)
+                } else {
+                    bootbox.alert(result.returnMessage)
+                }
+            } catch (e) {
+                bootbox.alert("Failed -  " + e)
+            }
+            ContinueCallBack()
+        }, function (error) {
+            bootbox.alert(error);
+            FailCallBack(error.toString());
+        })
+        ContinueCallBack()
+    }
+
+
+
+
+
+}
+
+
+
+
+
+

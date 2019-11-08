@@ -1,0 +1,246 @@
+
+//Add custom code to the form base goes right here - this is where you add custom functions that you need
+//to add to the form base object
+function onLoadFormBase1747(formBase) {
+
+    formBase.OpenTaskStatusTableClick = function (control, ControlInfo, result, ContinueCallBack, FailCallBack) {
+        try {
+
+
+            formBase.ReturnOpenTaskStatusTable(ControlInfo.userObject.ItemID, function (result) {
+                try {
+
+                    if (result.success) {
+
+                        try {
+                            kWLink.runReport(control.element, result.returnData.targetReportGuid, result.returnData.targetReportPropertiesGuid, 1, null, function (res) { }, null, null)
+
+                            ContinueCallBack();
+                        }
+                        catch (e) {
+                            FailCallBack(e);
+                        }
+
+                    } else {
+                        bootbox.alert(result.returnMessage);
+                    }
+                } catch (e) {
+                    bootbox.alert("Failed -  " + e);
+                }
+
+                ContinueCallBack();
+
+            }, function (error) {
+
+                FailCallBack(error.toString());
+            })
+        }
+        catch (e) {
+
+            FailCallBack(e.toString());
+        }
+    }
+
+
+    formBase.AddSubTaskForButtonClick = function (control, ControlInfo, result, ContinueCallBack, FailCallBack) {
+        try {
+
+            formBase.ReturnAddSubTaskForSteps(ControlInfo.userObject.tdtto, function (result) {
+                try {
+
+                    if (result.success) {
+
+                        try {
+                            kWLink.runReport(control.element, result.returnData.targetReportGuid, result.returnData.targetReportPropertiesGuid, 1, null, function (res) { }, null, null)
+                            ContinueCallBack();
+                            result.returnData.targetReportPropertiesGuid
+                        }
+                        catch (e) {
+                            FailCallBack(e);
+                        }
+                    }
+                    else {
+                        bootbox.alert(result.returnMessage);
+                    }
+                } catch (e) {
+                    bootbox.alert("Failed -  " + e);
+                }
+                ContinueCallBack();
+
+            }, function (error) {
+
+                FailCallBack(error.toString());
+            })
+        }
+        catch (e) {
+            FailCallBack(e.toString());
+        }
+    }
+    //EMA
+
+    formBase.EMAAfterClick = function (control, ControlInfo, result, ContinueCallBack, FailCallBack) {
+        try {
+
+            formBase.ReturnOpenItemReportFile(ControlInfo.userObject.ItemID, function (result) {
+                try {
+                    if (result.success) {
+                        try {
+                            kWLink.runReport(control.element, result.returnData.targetReportGuid, result.returnData.targetReportPropertiesGuid, 1, null, function (res) { }, null, null)
+                            ContinueCallBack();
+                        }
+                        catch (e) {
+                            FailCallBack(e);
+                        }
+
+
+                    } else {
+                        bootbox.alert(result.returnMessage);
+                    }
+                } catch (e) {
+                    bootbox.alert("Failed -  " + e);
+                }
+
+                ContinueCallBack();
+
+            }, function (error) {
+
+                FailCallBack(error.toString());
+            })
+        }
+
+        catch (e) {
+
+            FailCallBack(e.toString());
+
+        }
+    }
+    // CurrentContract
+    formBase.CurrentContractClicked = function (control, ControlInfo, result, ContinueCallBack, FailCallBack) {
+        try {
+
+            formBase.ReturnOpenItemReportFile(ControlInfo.userObject.ItemID, function (result) {
+                try {
+                    if (result.success) {
+                        try {
+                            kWLink.runReport(control.element, result.returnData.targetReportGuid, result.returnData.targetReportPropertiesGuid, 1, null, function (res) { }, null, null)
+                            ContinueCallBack();
+                        }
+                        catch (e) {
+                            FailCallBack(e);
+                        }
+
+
+                    } else {
+                        bootbox.alert(result.returnMessage);
+                    }
+                } catch (e) {
+                    bootbox.alert("Failed -  " + e);
+                }
+
+                ContinueCallBack();
+
+            }, function (error) {
+
+                FailCallBack(error.toString());
+            })
+        }
+
+        catch (e) {
+
+            FailCallBack(e.toString());
+
+        }
+
+    }
+    // """""""Metering Agreement"""""
+    formBase.MeteringAgreementClicked = function (control, ControlInfo, result, ContinueCallBack, FailCallBack) {
+        try {
+
+            formBase.ReturnOpenItemReportFile(ControlInfo.userObject.ItemID, function (result) {
+                try {
+                    if (result.success) {
+                        try {
+                            kWLink.runReport(control.element, result.returnData.targetReportGuid, result.returnData.targetReportPropertiesGuid, 1, null, function (res) { }, null, null)
+                            ContinueCallBack();
+                        }
+                        catch (e) {
+                            FailCallBack(e);
+                        }
+
+
+                    } else {
+                        bootbox.alert(result.returnMessage);
+                    }
+                } catch (e) {
+                    bootbox.alert("Failed -  " + e);
+                }
+
+                ContinueCallBack();
+
+            }, function (error) {
+
+                FailCallBack(error.toString());
+            })
+        }
+
+        catch (e) {
+
+            FailCallBack(e.toString());
+
+        }
+
+    }
+    //# LetterOfAuthority
+    formBase.LetterOfAuthorityClicked = function (control, ControlInfo, result, ContinueCallBack, FailCallBack) {
+        try {
+
+
+            formBase.ReturnOpenItemReportFile(ControlInfo.userObject.ItemID, function (result) {
+                try {
+
+                    if (result.success) {
+
+                        try {
+                            kWLink.runReport(control.element, result.returnData.targetReportGuid, result.returnData.targetReportPropertiesGuid, 1, null, function (res) { }, null, null)
+
+                            ContinueCallBack();
+                        }
+                        catch (e) {
+                            FailCallBack(e);
+                        }
+
+                    } else {
+                        bootbox.alert(result.returnMessage);
+                    }
+                } catch (e) {
+                    bootbox.alert("Failed -  " + e);
+                }
+                ContinueCallBack();
+
+            }, function (error) {
+
+                FailCallBack(error.toString());
+            })
+        }
+        catch (e) {
+
+            FailCallBack(e.toString());
+        }
+    }
+
+    //###
+
+}
+
+//Standard Class types are
+//kWInputText
+//kWLink
+//kWInputButton
+//kWFormBase
+//kWInputCheckBox
+//kWInputCalendar
+//kWInputNumber
+//kWTable
+
+
+

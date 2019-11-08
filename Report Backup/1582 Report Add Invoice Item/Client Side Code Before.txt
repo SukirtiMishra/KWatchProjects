@@ -1,0 +1,84 @@
+
+//Add custom code to the form base goes right here - this is where you add custom functions that you need
+//to add to the form base object
+function onLoadFormBase1582(formBase) {
+    formBase.GetMasterSubCategory = function (control, ControlInfo, result, ContinueCallBack, FailCallBack) {
+      
+        var MasterCategory = formBase.getControl("MasterCatagories").value();
+        formBase.GetCategoriesList(MasterCategory, function (result) {
+            try {
+                if (result.success) {
+                    var FilterSectionDIV1 = $(control.formBase().element).find("#InvoiceFromDrp")
+                    FilterSectionDIV1.html(result.returnData)
+                } else {
+                    bootbox.alert(result.returnMessage)
+                }
+            } catch (e) {
+                bootbox.alert("Failed -  " + e)
+            }
+            ContinueCallBack()
+        }, function (error) {
+            bootbox.alert(error);
+            FailCallBack(error.toString());
+        })
+        ContinueCallBack()
+    }
+    
+    formBase.BeforeAddClick = function (control, ControlInfo, continueCallBack, failCallBack) {
+              
+        try {
+          
+            var catogory = 0;
+            if (formBase.getControl("MasterCatagories").value() > 0)
+            {
+                catogory = formBase.getControl("Catagories").value();
+            }
+            else
+            {
+                catogory=0
+            }
+          
+                    ControlInfo.userObject = {
+                    Description: formBase.getControl("Description").value(),
+                    Amount: formBase.getControl("Amount").value(),
+                    InvoiceMasterCategory: formBase.getControl("MasterCatagories").value(),
+                    Catagories: catogory
+                };
+                 
+            continueCallBack();
+        }
+        catch (e) {
+            bootbox.alert(e.message, failCallBack());
+        }
+    }
+    
+    formBase.AfterAddClick = function (control, ControlInfo, result, ContinueCallBack, FailCallBack) {
+        try {
+          
+            if (result.success) {
+                formBase.getControl("Description").value("");
+                Amount: formBase.getControl("Amount").value("$0.00");
+                formBase.getControl("MasterCatagories").value(0);
+                formBase.getControl("Catagories").value(0);
+                var FilterSectionDIV1 = $(control.formBase().element).find("#InvoiceFromDrp");
+                FilterSectionDIV1.html(result.returnData);
+                bootbox.alert(result.returnMessage);
+                ContinueCallBack();
+
+            }          else {
+                bootbox.alert(result.returnMessage);
+                ContinueCallBack();
+            }
+        }
+
+        catch (e) {
+            FailCallBack(e);
+        }
+
+    }
+
+ 
+}
+
+
+

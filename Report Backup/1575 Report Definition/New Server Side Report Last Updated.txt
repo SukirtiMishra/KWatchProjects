@@ -1,0 +1,536 @@
+Imports kWHTML.Elements
+Imports WebManagement
+Imports kWHTML.kWForms
+Imports kWHTML
+Imports System.Text
+
+Namespace kWatchServer.defReport_Definitions
+    ''' <summary>"
+    ''' Define all custom code for this assembly within this class 
+    ''' </summary>
+    ''' <remarks></remarks>
+    Public Class WEBHTMLADD_kWItems
+        Implements WebForm
+#Region "Public Variables & Properties"
+
+        Public ReadOnly Property GetBaseClass As List(Of kWHTMLElementInputSelect.SelectOption)
+            Get
+                Dim Units As New List(Of kWHTMLElementInputSelect.SelectOption)
+                Dim firstSelectOption As New kWHTMLElementInputSelect.SelectOption
+                Dim list = (GetType(utlClassType)).GetFields()
+                For Each Itm In list
+                    If Itm.Name <> "value__" Then
+                        Units.Add(New kWHTMLElementInputSelect.SelectOption With {.id = Itm.GetRawConstantValue, .text = Itm.GetRawConstantValue() & " - " & Itm.Name})
+                    End If
+                Next
+                Return Units
+            End Get
+        End Property
+#End Region
+
+#Region "Form(Page) Load Methods"
+        ''' <summary>
+        ''' Main function that is returned to the lines of the report when it is ran
+        ''' </summary>
+        ''' <param name="html"></param>
+        ''' <remarks></remarks>
+        Public Sub GetReport(html As HTMLTextWriterkWatch) Implements WebForm.GetReport
+            Dim repBase = GetReportBase()
+            repBase.ToString(html)
+        End Sub
+        Public Function GetReportBase() As HTMLkWFormBase Implements WebForm.GetReportBase
+            'Create the form base obHTMLkWFormBaseject
+            Dim Form = HTMLkWFormBase.Create(Me)
+            Form.onLoadFormBase = "onLoadFormBase1575"  'make sure this matches the onLoadFormBase name
+            Form.JScript.Add(My.Resources.ClientScript)
+            Form.FormHeader.FormName = Report.Report_Definition.Name
+            GetAllControlsAddForm(Form)
+            Form.ScriptFunctionCallCodeObjectAdd(Function(c) c.AddItem(Nothing))
+            Form.ScriptFunctionCallCodeObjectAdd(Function(c) c.GetTemplate(String.Empty))
+            Form.ScriptFunctionCallCodeObjectAdd(Function(c) c.GetTemplateDesc(String.Empty))
+            Return Form
+        End Function
+#End Region
+
+#Region "Get All Controls"
+
+        Public Sub GetAllControlsAddForm(Form As HTMLkWFormBase(Of WEBHTMLADD_kWItems))
+            Dim ReportName = kWHTMLElementInputText.CreateDirect(Me, "ReportName", Nothing)
+            ReportName.LabelString = "Report Name"
+            ReportName.ClassName = "form-control"
+
+            Dim BaseClassType = kWHTMLElementInputSelect.CreateDirect(Me, 0, "BaseClassType", GetBaseClass)
+            BaseClassType.FontSize = FontSize.medium
+            BaseClassType.LabelString = "Base Class Type"
+            BaseClassType.NothingValue = 0
+
+            BaseClassType.NothingText = "Select Base Class"
+            BaseClassType.SortOptions = False
+            BaseClassType.onAfterUpdateEvent.onAfterTriggerFunctionName = "GetBaseClassTemplate"
+
+            Dim CodeType = kWHTMLElementInputSelect.CreateDirect(Me, 1, "CodeType", GetType(defCodeType))
+            CodeType.LabelString = "Code Type"
+
+            Dim DivTemplate As New HTMLElementDIV
+            DivTemplate.ID = "Dropdowntemplate"
+            DivTemplate.Controls.Add(Templates(utlClassType.utlClassTypeactAccount))
+
+            Dim DivLable = New HTMLElementDIV
+            DivLable.ID = "DivLable"
+            DivLable.Controls.Add(GetTemplateDesc(270))
+
+            Dim CreateReport = kWHTMLElementButton.Create(Me, "Add Report Definition")
+            CreateReport.ID = "BtnCreateReport"
+            CreateReport.ClassName = "btn btn-primary"
+            CreateReport.onClickEvent.onBeforeTriggerFunctionName = "BeforeAddClick"
+            CreateReport.onClickEvent.eventDelegate = Function(c) c.AddItem(Nothing)
+            CreateReport.onClickEvent.onAfterTriggerFunctionName = "AfterAddClick"
+
+            Dim ChkOpenItemCheckbox = kWHTMLElementInputCheckBox.CreateDirect(Me, False, "OpenItem")
+            ChkOpenItemCheckbox.LabelString = "Open Item"
+            ChkOpenItemCheckbox.placeholder = String.Empty
+
+            Form.FormSectionMain.Add(ReportName)
+            Form.FormSectionMain.Add(BaseClassType)
+            Form.FormSectionMain.Add(CodeType)
+            Form.FormSectionMain.Add("Create Based on Template", DivTemplate)
+            Form.FormSectionMain.Add("Template Description", DivLable)
+            Form.FormSectionMain.Add(ChkOpenItemCheckbox)
+            Form.FormSectionMain.Add("", CreateReport)
+
+        End Sub
+#End Region
+
+#Region "Some Important Functions & Calculate Data"
+        Public Function AddItem(info As kWControlEventInfo) As kWControlEventReturnInfo
+            Try
+                Dim ReportName As String = info.userObject.ReportName
+                Dim ClassType As Integer = info.userObject.ClassType
+                Dim CodeType As Boolean = info.userObject.CodeType
+                Dim TemplateID As Integer = info.userObject.BaseclassTemplate
+                Dim errMsg = ValidationSummary(ReportName, TemplateID)
+                If Not String.IsNullOrEmpty(errMsg.ToString) Then
+                    Return New kWControlEventReturnInfo With {.success = False, .returnMessage = errMsg.ToString}
+                End If
+                Dim ReportDef As defReport_DefinitionSetUp = Me.User.Banks(CStr(utlClassType.utlClassTypedefReport_Definition_Bank)).SetUpObject
+                ReportDef.IDs = "#sql# select 1 from defReport_Definitions where Name = '" & ReportName & "' and base_classtype= '" & ClassType & "'"
+                Dim Items = New kWatchServer.kWItems
+                Items.Initialize(Me.User, ReportDef)
+                If Items.Count > 0 Then
+                    Return New kWControlEventReturnInfo With {.success = False, .returnMessage = "Report Definition Already Exists"}
+                End If
+                Dim NewReportDefinition = ReportDef.Add(ReportName, ClassType)
+                NewReportDefinition.CodeType = CodeType
+                AddAssembly(NewReportDefinition.ID, TemplateID)
+                Dim ReportInfo As Object = New Dynamic.ExpandoObject
+                ReportInfo.targetReportGuid = CType(NewReportDefinition.Reports_Definitions.Item_By_Name("LOCALHTML_" & TypeName(NewReportDefinition)).ClassObject, defRun_Report_Definition).RunReportGUID ' "43567d47-b760-4c5a-b527-b9b702540a19"
+                ReportInfo.targetReportPropertiesGuid = Nothing '"{}"
+                Return New kWControlEventReturnInfo With {.success = True, .returnData = ReportInfo, .returnMessage = "Report Definition Created Sucessfully <br> Report id :" & NewReportDefinition.ID}
+            Catch ex As Exception
+                Return New kWControlEventReturnInfo With {.success = False, .returnMessage = ex.ToString}
+            End Try
+        End Function
+
+        Public Function AddAssembly(ReportID As String, TemplateID As Integer) As Integer
+            Try
+                Dim AssSetup = New kWatchServer.defAssemblySetUp
+                AssSetup.AssemblyIDs = "0"
+                Dim Items = New kWatchServer.kWItems
+                Items.Initialize(Me.User, CObj(AssSetup))
+                Dim DefRep = Me.User.GetkWItem(utlClassType.utlClassTypedefReport_Definition, CInt(ReportID)).ClassObject
+                Dim ReportName = Replace(DefRep.Name, " ", "_")
+                Dim AssemblyName = DefRep.Base_ChildClassModuleName & "_" & Replace(DefRep.Name, " ", "_")
+                Dim AssemblyNameSpace = "kWatchServer." & DefRep.Base_ChildClassModuleName & "s"
+                Dim AssID = Items.Reports_Definitions.Item_By_Name("LOCALHTMLADD_kWItems").ClassObject.CodeObject.AddAssembly(DefRep.Base_ClassType, AssemblyName, AssemblyNameSpace, ReportName, DefRep.LongID, DefRep.Description, DefRep.CodeType, TemplateID)
+                DefRep.AssemblyID = AssID
+                Return AssID
+            Catch ex As Exception
+                Return ex.Message
+            End Try
+        End Function
+        Public Function GetTemplate(Baseclass As utlClassType) As kWControlEventReturnInfo
+            Try
+                Return New kWControlEventReturnInfo With {.success = True, .returnData = Templates(Baseclass).ToString}
+            Catch ex As Exception
+                Return New kWControlEventReturnInfo With {.success = False, .returnData = ex.Message}
+            End Try
+        End Function
+
+        Public Function GetTemplateDesc(TemplateID As Integer) As HTMLBase
+            Dim Gen As New kWatchCodeGenerator.defReportCodeGenerator
+            Return New HTMLText(Gen.GetTemplateDescription(Me.User, TemplateID))
+        End Function
+#End Region
+
+#Region "All Lists DefReport"
+        Public Function Templates(pasBaseClassType As utlClassType) As HTMLBase
+            Dim TemplateItemList As List(Of kWHTMLElementInputSelect.SelectOption)
+            If pasBaseClassType > 0 Then
+                Dim CodeGen = New kWatchCodeGenerator.defReportCodeGenerator
+                Dim gloablFunc As New kWServerGlobals
+                Dim ClassCategory = gloablFunc.GetClassCategory(pasBaseClassType)
+                TemplateItemList = {New kWHTMLElementInputSelect.SelectOption With {.id = 0, .text = "Select Template"}}.ToList
+                If ClassCategory = utlClassCategory.utlClassCategory_Item Or ClassCategory = utlClassCategory.utlClassCategory_Other Then
+                    Dim TemplateItem = (From t In CodeGen.GetTemplatesReportDefinition(Me.User, utlClassType.utlClassTypekWitem) Select New kWHTMLElementInputSelect.SelectOption With {.id = t.ID, .text = t.Assembly.Name}).ToList
+                    If TemplateItem.Count > 0 Then
+                        TemplateItemList.AddRange(TemplateItem)
+                    End If
+                ElseIf ClassCategory = utlClassCategory.utlClassCategory_Items Then
+                    Dim TemplateList = (From t In CodeGen.GetTemplatesReportDefinition(Me.User, utlClassType.utlClassTypekWitems) Select New kWHTMLElementInputSelect.SelectOption With {.id = t.ID, .text = t.Assembly.Name}).ToList
+                    If TemplateList.Count > 0 Then
+                        TemplateItemList.AddRange(TemplateList)
+                    End If
+                End If
+                Dim TemplateListNew = (From t In CodeGen.GetTemplatesReportDefinition(Me.User, pasBaseClassType) Select New kWHTMLElementInputSelect.SelectOption With {.id = t.ID, .text = t.Assembly.Name}).ToList
+                If TemplateListNew.Count > 0 Then
+                    TemplateItemList.AddRange(TemplateListNew)
+                End If
+            Else
+                TemplateItemList = {New kWHTMLElementInputSelect.SelectOption With {.id = 0, .text = "Template Not Selected"}}.ToList
+            End If
+            Dim BaseclassTemplate = kWHTMLElementInputSelect.CreateDirect(Me, 0, "BaseclassTemplate", TemplateItemList)
+            BaseclassTemplate.LabelDisplay = False
+            BaseclassTemplate.FontSize = FontSize.medium
+            BaseclassTemplate.NothingInclude = False
+            Return BaseclassTemplate
+        End Function
+#End Region
+
+#Region "Validation Summary"
+        Public Function ValidationSummary(ReportName As String, TemplateID As Integer) As StringBuilder
+            Dim errMsg As New StringBuilder
+            Dim ReportNameResult As Boolean = ValidateSpecialCharacters(ReportName)
+            If ReportNameResult = True Then
+                errMsg.AppendLine("Special Characters Not Allowed In Design Name</br>")
+            End If
+            If ReportName.Length <= 0 Then
+                errMsg.AppendLine("Please Select Report Name</br>")
+            End If
+            If ClassType = 0 Then
+                errMsg.AppendLine("Please Select Base Class Type</br>")
+            End If
+            If TemplateID = 0 Then
+                errMsg.AppendLine("Please Select Base Class Template</br>")
+            End If
+            Return errMsg
+        End Function
+
+        Function ValidateSpecialCharacters(stringname As String) As Boolean
+            Dim result As Boolean = False
+            result = stringname.IndexOfAny("[~`!@#$%^&*()-+=|{}':;.,<>/?]".ToCharArray) <> -1
+            Return result
+        End Function
+#End Region
+
+#Region "Default Code"
+
+        <ThreadStatic()>
+        Public Shared SharedMe As WEBHTMLADD_kWItems
+        Public Property ReportIcon As Icons Implements WebForm.ReportIcon
+
+        Public Function RefreshFormBase() As String Implements WebForm.RefreshFormBase
+            'Get the report
+            Dim repBase As HTMLkWFormBase(Of WEBHTMLADD_kWItems) = GetReportBase()
+            'This wil l exclude the jscript code and other items
+            repBase.RefreshPageCall = True
+            Dim html As New HTMLTextWriterkWatch
+            repBase.ToString(html)
+            'Return the string that contains the main contents of this report with extras
+            Return html.ToString
+        End Function
+        ''' <summary>
+        ''' Initialization code in here for this report.  This code will be called each time the report is ran
+        ''' other call reports should also call this before using the report output or any contained functions
+        ''' </summary>
+        ''' <remarks></remarks>
+        Public Sub SetDefaults() Implements defReport_Definitions.defReportDefinitionBase.SetDefaults
+            If Len(ItemReferance) = 0 Then ItemReferance = "User.Get_Item_Object(""" & Report.LongID & """, True).ClassObject.Object"
+            SharedMe = Me
+        End Sub
+
+#Region "Settings"
+
+
+        Public Sub BrowserControl_onLoad()
+
+            ''On Error Resume Next
+            ''Window.SetTimeout "BrowserControl.SizeToFit", 1000, "VbScript"
+            'If [HasWindow] Then
+            '    BrowserControl.SizeToFit
+            '    'BrowserControl.Width = 15000
+            '    'BrowserControl.Height = 10000
+            '    'BrowserControl.SizeToFit
+            '    BrowserControl.RefForm.Caption = "Add [me.Bank.Child_ClassName]"
+            '    BrowserControl.Icon = "..\iconsbmp\[me.Icon].bmp"
+            '    'BrowserControl.Icon = "c:\temp\help.jpg"
+            'End If
+
+        End Sub
+        Public Function IsReady()
+            'Dim problem
+
+            'If Len(ReportName.Value) = 0 Then
+            '    problem = problem & "Please enter Name for the [me.Bank.Child_ClassName]" & vbCrLf
+            'Else
+            '    If InStr("-", ReportName.Value) > 0 Then
+            '        problem = problem & "You cannot use the ""-"" in the name, Please only use normal characeters without spaces, no &$#@* as an example" & vbCrLf
+            '    ElseIf InStr(" ", ReportName.Value) > 0 Then
+            '        problem = problem & "You cannot use the "" "" in the name, Please only use normal characeters without spaces, no &$#@* as an example" & vbCrLf
+            '    End If
+            'End If
+
+
+            'If BaseClassType.Value = 0 Then
+            '    problem = problem & "Please select a valid Base Class type" & vbCrLf
+            'End If
+
+            'If Templates.Value = 0 Then
+            '    problem = problem & "Please select a valid Template" & vbCrLf
+            'End If
+
+            'IsReady = problem
+
+        End Function
+        Public Function GetAddProcedure()
+            'Use this procedure to get the add command procedure that is used to add items of this type to the SQL server
+            Return Me.Bank.AddCommandProcedure
+        End Function
+        Public Function Templates(BaseClassType)
+            Dim prvTemplates = New kWatchServer.kWItems
+            Dim SetUp = New kWatchServer.defReport_DefinitionSetUp
+            SetUp.Categories = "template"
+            SetUp.Base_ClassTypes = BaseClassType
+            If User.Banks.GetChildClassTypeFromItems(CLng(BaseClassType)) > 0 Then
+                'This means that it is a kWItems type of object
+                SetUp.Base_ClassTypes = SetUp.Base_ClassTypes & "," & utlClassType.utlClassTypekWitems
+            ElseIf User.Banks.GetBankClassType(CLng(BaseClassType)) > 0 Then
+                'This means that it is a kWItem type object
+                SetUp.Base_ClassTypes = SetUp.Base_ClassTypes & "," & utlClassType.utlClassTypekWitem
+            End If
+            SetUp.Base_ClassTypes = SetUp.Base_ClassTypes & "," & utlClassType.utlClassTypeusrUser
+            prvTemplates.Initialize(Me.User, CObj(SetUp))
+            Return prvTemplates
+
+        End Function
+        Public Function GetTemplates(BaseClassType)
+            Dim AssItems = New kWatchServer.kWItems
+            Dim AssSetup = New kWatchServer.defAssemblySetUp
+            AssSetup.AssemblyIDs = "0"
+            AssItems.Initialize(Me.User, CObj(AssSetup))
+            'msgbox CStr(AssItems.Reports_Definitions.Item_By_Name("LOCALHTMLADD_kWItems").ClassObject.CodeObject.GetTemplateSelectionForReportDefintionHTML(cint(BaseClassType)))
+            Return CStr(AssItems.Reports_Definitions.Item_By_Name("LOCALHTMLADD_kWItems").ClassObject.CodeObject.GetTemplateSelectionForReportDefintionHTML(CInt(BaseClassType)))
+            'With me.User.Reports_Definitions.Item_By_Name("HTML_Select").ClassObject
+            '         With .CodeObject
+            '                  .SetDefaults
+            '                  .ID = "templateID"
+            '                  '.kWID = Me.LongID
+            '                  '.DataField = "BaseClassType"
+            '                  .Width = "350px"
+            '                  .Value = 914	'This is the default template
+            '                  .Editable = True
+            '                  .ShowEditButton = False
+            '	  Set .Items = Templates(BaseClassType)
+            '	  .Title = "Templates are any existing reports that are in the category 'template'"
+            '                 '.List = "2,Electricity Comercial|1,Electricity Industrial|5,Electricity Public Lighting|4,Electricity Residential|3,Electricity Retail|6,Electricity Small Business|8,Gas Comercial|7,Gas Industrial|10,Gas Residential Industrial|9,Gas Retail|11,Gas Small Business"
+            '                  '.EnumType = "utlClassType"
+            '         End With
+            '         GetTemplates= .EvaluateAsText(False)
+            'End With
+        End Function
+
+        Public Function CopyFromTemplate(newReportID, TemplateID)
+            Dim ReportDef = User.Get_Item_Object("68~" & TemplateID, True).ClassObject
+            Dim NewReportDef = User.Get_Item_Object("68~" & newReportID, True).ClassObject
+            NewReportDef.Description = ReportDef.Description
+            NewReportDef.FileCategory = ReportDef.FileCategory
+            NewReportDef.Output_Template = ReportDef.Output_Template
+            NewReportDef.Output_Type = ReportDef.Output_Type
+            NewReportDef.Test_ID = ReportDef.Test_ID
+            NewReportDef.Test_Output_Type = ReportDef.Test_Output_Type
+            NewReportDef.Test_Output_View_Objects = ReportDef.Test_Output_View_Objects
+            NewReportDef.Visibility = ReportDef.Visibility
+            NewReportDef.ViewToolbar = ReportDef.ViewToolbar
+            NewReportDef.Default_File_Name_Definition = ReportDef.Default_File_Name_Definition
+
+            For Each Line In ReportDef.Lines
+                Line = Line.ClassObject
+                Dim NewLine = Line.Bank.Add(NewReportDef.ID, Line.Line_Number).ClassObject
+                '@Report_Definition_ID int, @Line_Number int
+
+                NewLine.Bold = Line.Bold
+                NewLine.Break = Line.Break
+                NewLine.Carriage_Returns = Line.Carriage_Returns
+                NewLine.Condition = Line.Condition
+                NewLine.Description = Line.Description
+                NewLine.Font_Name = Line.Font_Name
+                NewLine.Font_Size = Line.Font_Size
+                NewLine.Heading = Line.Heading
+                NewLine.Indent = Line.Indent
+                NewLine.Italic = Line.Italic
+                NewLine.Page_Layout = Line.Page_Layout
+                NewLine.rtf = Line.rtf
+                NewLine.Tabs = Line.Tabs
+                NewLine.Text = Line.Text
+                NewLine.UnderLine = Line.UnderLine
+            Next
+
+            NewReportDef.Calculations = ReportDef.Calculations
+            Return Nothing
+        End Function
+
+
+
+        ''' <summary>
+        ''' This is a callback that is called after the report if produced.  The report is a document of type Word, Excel, Email or RTF
+        ''' This depends on the type of report produced
+        ''' </summary>
+        ''' <param name="ReportObj">The Report object</param>
+        ''' <remarks></remarks>
+        Public Sub AfterReportProduce(ByVal ReportObj As Object) Implements defReport_Definitions.defReportDefinitionBase.AfterReportProduce
+        End Sub
+
+        ''' <summary>
+        ''' The callback is called after the file has been saved to kWatch.  The file object is a referances to the filFile object that has 
+        ''' just been saved
+        ''' </summary>
+        ''' <param name="File">The newly saved file</param>
+        ''' <remarks></remarks>
+        Public Sub AfterFileSave(ByVal File As kWatchServer.filFile) Implements defReport_Definitions.defReportDefinitionBase.AfterFileSave
+        End Sub
+
+
+        ''' <summary>
+        ''' This is the web request object that has been passed back from the originating call. This contains
+        ''' information relating to the browser, the call been made and the IIS server that the call came from.
+        ''' This is a copy of the request object that is generated by the server 
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Property Request As UserRequest Implements WebForm.Request
+
+        ''' <summary>
+        ''' This is the WebSite that this request belongs to
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Property Web As webWebSite Implements WebForm.Web
+
+        ''' <summary>
+        ''' This is the webContact that relatest to this request
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Property WebContact As webContactLogin Implements WebForm.WebContact
+        ''' <summary>
+        ''' This will return the settings object as a dynamic expando object that you can review and edit.  If you
+        ''' want your settings object casted to a specific type, use the GetSettings function.  Setting an object
+        ''' to this location will also update the settings object for you as well
+        ''' 
+        ''' This will get the settings object for this report object.  Settings objects are unique based on
+        ''' the RunReportID, LoggedInContact (either web or local), The active WebID or web site, a DashboardwidgetID and
+        ''' optionaly a SettingsLocationID that you might choose to use.
+        ''' 
+        ''' So for a kWatch report delivered within kWatch - this would be unique based on RunReportID and contactID only as
+        ''' webID, DashboardwidgetID and SettinglocationID are all nothing
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Property Settings As Object Implements WebForm.Settings
+            Get
+                Return WebManagement.SettingsManagement.GetSettings(Me) ' Newtonsoft.Json.JsonConvert.DeserializeObject(Of ExpandoObject)(Me.SettingsRecord.SettingsObject)
+            End Get
+            Set(value As Object)
+                WebManagement.SettingsManagement.SaveSettings(value, Me)
+            End Set
+        End Property
+
+        ''' <summary>
+        ''' This will return the settings object as a dynamic expando object that you can review and edit.  If you
+        ''' want your settings object casted to a specific type, use the GetSettings function.  Setting an object
+        ''' to this location will also update the settings object for you as well
+        ''' 
+        ''' This will get the settings object for this report object.  Settings objects are unique based on
+        ''' the RunReportID, LoggedInContact (either web or local), The active WebID or web site, a DashboardwidgetID and
+        ''' optionaly a SettingsLocationID that you might choose to use.
+        ''' 
+        ''' So for a kWatch report delivered within kWatch - this would be unique based on RunReportID and contactID only as
+        ''' webID, DashboardwidgetID and SettinglocationID are all nothing
+        ''' </summary>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Function GetSettings(Of SettingObjectType)() As SettingObjectType Implements WebForm.GetSettings
+
+            Return WebManagement.SettingsManagement.GetSettings(Of SettingObjectType)(Me)
+
+        End Function
+
+        ''' <summary>
+        ''' This will save the settings object to the database
+        ''' </summary>
+        ''' <typeparam name="SettingObjectType"></typeparam>
+        ''' <param name="Obj"></param>
+        ''' <remarks></remarks>
+        Public Sub SaveSettings(Of SettingObjectType)(Obj As SettingObjectType) Implements WebForm.SaveSettings
+
+            WebManagement.SettingsManagement.SaveSettings(Obj, Me)
+
+        End Sub
+
+        ''' <summary>
+        ''' This is a global property that if set - will be used as a reportProperties object by the dash-board component
+        ''' You do not need to set this - and it is set if this report is used as 
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        <kWHTML.kWForms.reportProperty>
+        Public Property DashboardWidgetID As Integer? Implements WebForm.DashboardWidgetID
+        ''' <summary>
+        ''' This will get the settings record for this report object.  Settings objects are created and unique based on
+        ''' the RunReportID, LoggedInContact (either web or local), The active WebID or web site, a dash-board Widget ID and
+        ''' optionaly a SettingsLocationID that you might choose to use.
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public ReadOnly Property SettingsRecord As defReportSetting Implements WebForm.SettingsRecord
+            Get
+                Return WebManagement.SettingsManagement.GetSettingsRecord(Me)
+            End Get
+        End Property
+
+
+        ''' <summary>
+        ''' This will return the guid that is used within the report object
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public ReadOnly Property ReportPropertiesGuid As Guid Implements WebForm.ReportPropertiesGuid
+            Get
+                Return WebManagement.SettingsManagement.getReportPropertiesGuid(Me)
+            End Get
+        End Property
+
+        ''' <summary>
+        ''' This wil return the report properties object for this report
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public ReadOnly Property ReportProperties As Object Implements WebForm.ReportProperties
+            Get
+                Return WebManagement.SettingsManagement.GetReportProperties(Me)
+            End Get
+        End Property
+#End Region
+
+
+#End Region
+
+    End Class
+End Namespace

@@ -1,0 +1,274 @@
+
+//Add custom code to the form base goes right here - this is where you add custom functions that you need
+//to add to the form base object
+function onLoadFormBase1669(formBase) {
+
+    formBase.ChangeValueCalculationOnUsage = function (control, ControlInfo, result, ContinueCallBack, FailCallBack) {
+        try {
+            formBase.UsageTypeErrorTableReturnInfo(function (result) {
+                try {
+                    if (result.success) {
+                        var FilterSectionDIV = $(control.formBase().element).find("#RefreshForCalculationUsageType");
+                        //; should be used as standard line terminator
+                        FilterSectionDIV.html(result.returnData)
+                    } else {
+                        bootbox.alert(result.returnMessage)
+                    }
+                } catch (e) {
+                    bootbox.alert("Failed -  " + e)
+                }
+
+                ContinueCallBack()
+
+            }, function (error) {
+                //FailCallBack already shows alert - bootbox.alert(error);
+                FailCallBack(error.toString());
+            })
+        }
+        catch (e) {
+
+            FailCallBack(e.toString());
+        }
+
+    }
+
+
+
+    formBase.ChangeValueCalculationOnRate = function (control, ControlInfo, result, ContinueCallBack, FailCallBack) {
+        try {
+            formBase.RateTypeErrorTableReturnInfo(function (result) {
+                try {
+                    if (result.success) {
+                        var FilterSectionDIV = $(control.formBase().element).find("#RateErrortypeDivisionID");
+                        //; should be used as standard line terminator
+                        FilterSectionDIV.html(result.returnData)
+                    } else {
+                        bootbox.alert(result.returnMessage)
+                    }
+                } catch (e) {
+                    bootbox.alert("Failed -  " + e)
+                }
+
+                ContinueCallBack()
+
+            }, function (error) {
+                //FailCallBack already shows alert - bootbox.alert(error);
+                FailCallBack(error.toString());
+            })
+        }
+        catch (e) {
+
+            FailCallBack(e.toString());
+        }
+
+    }
+
+
+    formBase.ResolvedClick = function (control, ControlInfo, result, ContinueCallBack, FailCallBack) {
+        try {
+            var CheckBoxValue = formBase.getControl("Resolved").value();
+            formBase.GetDivisionFormClienSideEleventhSection(CheckBoxValue, function (result) {
+                try {
+                    if (result.success) {
+                        var FilterSectionDIV = $(control.formBase().element).find("#DivFromClientSideEleventhSectionID");
+                        //; should be used as standard line terminator
+                        FilterSectionDIV.html(result.returnData)
+                    } else {
+                        bootbox.alert(result.returnMessage)
+                    }
+                } catch (e) {
+                    bootbox.alert("Failed -  " + e)
+                }
+
+                ContinueCallBack()
+
+            }, function (error) {
+                //FailCallBack already shows alert - bootbox.alert(error);
+                FailCallBack(error.toString());
+            })
+        }
+
+        catch (e) {
+
+            FailCallBack(e.toString());
+
+        }
+
+    }
+
+    formBase.ResolvedClickTwelth = function (control, ControlInfo, result, ContinueCallBack, FailCallBack) {
+        try {
+            var CheckBoxValue = formBase.getControl("ResolvedTwelth").value();
+            formBase.GetDivisionFormClienSideTwelthSection(CheckBoxValue, function (result) {
+                try {
+                    if (result.success) {
+                        var FilterSectionDIV = $(control.formBase().element).find("#DivFromClientSideTwelthSectionID");
+                        //; should be used as standard line terminator
+                        FilterSectionDIV.html(result.returnData)
+                    } else {
+                        bootbox.alert(result.returnMessage)
+                    }
+                } catch (e) {
+                    bootbox.alert("Failed -  " + e)
+                }
+
+                ContinueCallBack()
+
+            }, function (error) {
+                //FailCallBack already shows alert - bootbox.alert(error);
+                FailCallBack(error.toString());
+            })
+        }
+
+        catch (e) {
+
+            FailCallBack(e.toString());
+
+        }
+
+    }
+    formBase.ShowHideCalculationBasisAndUpdateButton = function (control, ControlInfo, result, ContinueCallBack, FailCallBack) {
+        try {
+            //CalculateError
+            var CheckBoxValue = formBase.getControl("CalculateError").value();
+
+            formBase.ReturnDivisionwithCalculationBasis(CheckBoxValue, function (result) {
+                try {
+                    if (result.success) {
+                        var FilterSectionDIV = $(control.formBase().element).find("#DivCalculationBasis");
+                        //; should be used as standard line terminator
+                        FilterSectionDIV.html(result.returnData)
+                    } else {
+                        bootbox.alert(result.returnMessage)
+                    }
+                } catch (e) {
+                    bootbox.alert("Failed -  " + e)
+                }
+
+                ContinueCallBack()
+
+            }, function (error) {
+                //FailCallBack already shows alert - bootbox.alert(error);
+                FailCallBack(error.toString());
+            })
+        }
+
+        catch (e) {
+
+            FailCallBack(e.toString());
+
+        }
+
+    }
+
+
+    formBase.ShowHideCalcBasisAndUpdateButton = function (control, ControlInfo, result, ContinueCallBack, FailCallBack) {
+        try {
+            //CalculateError
+            var CheckBoxValue = formBase.getControl("Calc").value();
+
+            formBase.ReturnDivisionwithCalcBasis(CheckBoxValue, function (result) {
+                try {
+                    if (result.success) {
+                        var FilterSectionDIV = $(control.formBase().element).find("#DivCalcBasisss");
+                        //; should be used as standard line terminator
+                        FilterSectionDIV.html(result.returnData)
+                    } else {
+                        bootbox.alert(result.returnMessage)
+                    }
+                } catch (e) {
+                    bootbox.alert("Failed -  " + e)
+                }
+
+                ContinueCallBack()
+
+            }, function (error) {
+                //FailCallBack already shows alert - bootbox.alert(error);
+                FailCallBack(error.toString());
+            })
+        }
+
+        catch (e) {
+
+            FailCallBack(e.toString());
+
+        }
+
+    }
+
+    formBase.ButtonUpdatClick = function (control, ControlInfo, result, ContinueCallBack, FailCallBack) {
+        try {
+            //CalculateError
+            formBase.UpdateValuesFromDataBase( function (result) {
+                try {
+                    if (result.success) {
+                    
+                    } else {
+                        bootbox.alert(result.returnMessage)
+                    }
+                } catch (e) {
+                    bootbox.alert("Failed -  " + e)
+                }
+
+                ContinueCallBack()
+
+            }, function (error) {
+                //FailCallBack already shows alert - bootbox.alert(error);
+                FailCallBack(error.toString());
+            })
+        }
+
+        catch (e) {
+
+            FailCallBack(e.toString());
+
+        }
+
+    }
+
+
+    formBase.TestingTesting = function (control, ControlInfo, result, ContinueCallBack, FailCallBack) {
+        try {
+            //CalculateError
+            formBase.returnDivisionwithMe(function (result) {
+                try {
+                    if (result.success) {
+                        bootbox.alert(result.returnMessage)
+
+                    } else {
+                        bootbox.alert(result.returnMessage)
+                    }
+                } catch (e) {
+                    bootbox.alert("Failed -  " + e)
+                }
+
+                ContinueCallBack()
+
+            }, function (error) {
+                //FailCallBack already shows alert - bootbox.alert(error);
+                FailCallBack(error.toString());
+            })
+        }
+
+        catch (e) {
+
+            FailCallBack(e.toString());
+
+        }
+
+    }
+
+}
+
+//Standard Class types are
+//kWInputText
+//kWLink
+//kWInputButton
+//kWFormBase
+//kWInputCheckBox
+//kWInputCalendar
+//kWInputNumber
+//kWTable
+
+
+

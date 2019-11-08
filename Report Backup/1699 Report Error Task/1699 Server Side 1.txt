@@ -1,0 +1,993 @@
+Imports kWGlobalFunctions.kWGlobalsShared
+Imports kWHTML
+Imports kWHTML.Elements
+Imports WebManagement
+Imports kWHTML.kWForms
+Imports kWHTML.kWTables
+
+Namespace kWatchServer.tskTaskErrors
+    ''' <summary>"
+    ''' Define all custom code for this assembly within this class 
+    ''' </summary>
+    ''' <remarks></remarks>
+    Public Class WEBHTML_tskTaskErrors
+        Implements WebForm
+        Public Property PrvDiff As String = Nothing
+        Public Property PrvTotal As String = Nothing
+        Public Property PrvDiffRate As String = Nothing
+        Public Property PrvTotalRate As String = Nothing
+        'Default Variables
+
+        Public AllowOpen As Boolean    'If this is true it will provide a means to open the Task Error
+        Public FormReturnType As Integer   'This is a number as detailed below and it controls how it is all returned
+        Public CSSInclude As Boolean
+        Public CalculationsOnly As Boolean
+
+
+
+        ' ''' <summary>
+        ' ''' Example - This can be used as a report property - note the <reportProperty>  attribute that has been applied
+        ' ''' </summary>
+        ' ''' <value></value>
+        ' ''' <returns></returns>
+        ' ''' <remarks></remarks>
+        '<reportProperty>
+
+        ''' <summary>
+        ''' Main function that is returned to the lines of the report when it is ran
+        ''' </summary>
+        ''' <param name="html"></param>
+        ''' <remarks></remarks>
+        Public Sub GetReport(html As HTMLTextWriterkWatch) Implements WebForm.GetReport
+            Dim repBase = GetReportBase()
+            repBase.ToString(html)
+        End Sub
+        Public Sub SetDefaults() Implements defReport_Definitions.defReportDefinitionBase.SetDefaults
+
+            FormReturnType = 0
+            AllowOpen = True
+            CSSInclude = True
+            CalculationsOnly = False
+            SharedMe = Me
+        End Sub
+        Public Function GetReportBase() As HTMLkWFormBase Implements WebForm.GetReportBase
+            Dim Form = HTMLkWFormBase.Create(Me)
+            Form.onLoadFormBase = "onLoadFormBase1669"
+            Form.JScript.Add(My.Resources.ClientScript)
+            Form.IncludeHeader = False
+            GetAllControls(Form)
+            Form.ScriptFunctionCallCodeObjectAdd(Function(c) c.ReturnDivisionwithCalculationBasis(Nothing))
+            Form.ScriptFunctionCallCodeObjectAdd(Function(c) c.GetDivisionFormClienSideEleventhSection(Nothing))
+            Form.ScriptFunctionCallCodeObjectAdd(Function(c) c.GetDivisionFormClienSideTwelthSection(Nothing))
+            Form.ScriptFunctionCallCodeObjectAdd(Function(c) c.UsageTypeErrorTableReturnInfo())
+            Form.ScriptFunctionCallCodeObjectAdd(Function(c) c.RateTypeErrorTableReturnInfo)
+            Form.ScriptFunctionCallCodeObjectAdd(Function(c) c.UpdateValuesFromDataBase)
+            Form.ScriptFunctionCallCodeObjectAdd(Function(c) c.ReturnDivisionwithCalcBasis(Nothing))
+            Return Form
+        End Function
+
+        Public Function ReturnDivisionwithCalcBasis(CalcCondition As Boolean) As kWControlEventReturnInfo
+            Try
+                Return New kWControlEventReturnInfo With {.success = True, .returnData = CalcBasisWithUpdateButton(CalcCondition).ToString}
+            Catch ex As Exception
+                Return New kWControlEventReturnInfo With {.success = False, .returnMessage = "Failed Due To :" & ex.Message.ToString}
+            End Try
+        End Function
+        Public Function UpdateValuesFromDataBase() As kWControlEventReturnInfo
+            Try
+                Return New kWControlEventReturnInfo With {.success = True, .returnData = UpdateValues()}
+            Catch ex As Exception
+                Return New kWControlEventReturnInfo With {.success = False, .returnMessage = "Failed Due To :" & ex.Message.ToString}
+            End Try
+        End Function
+        Public Function RateTypeErrorTableReturnInfo() As kWControlEventReturnInfo
+            Try
+                Return New kWControlEventReturnInfo With {.success = True, .returnData = RateTypeErrorTable().ToString}
+            Catch ex As Exception
+                Return New kWControlEventReturnInfo With {.success = False, .returnMessage = "Failed Due to " & ex.Message.ToString}
+            End Try
+        End Function
+        Public Function UsageTypeErrorTableReturnInfo() As kWControlEventReturnInfo
+            Try
+                Return New kWControlEventReturnInfo With {.success = True, .returnData = UsageTypeErrorTable().ToString}
+            Catch ex As Exception
+                Return New kWControlEventReturnInfo With {.success = False, .returnMessage = "Failed Due To:" & ex.Message.ToString}
+            End Try
+        End Function
+        Public Function GetDivisionFormClienSideTwelthSection(CheckBoxResolvedTwelthSection As Boolean) As kWControlEventReturnInfo
+            Try
+                Return New kWControlEventReturnInfo With {.success = True, .returnData = RawCloseRawTwelthSectionFromClientSide(CheckBoxResolvedTwelthSection).ToString}
+            Catch ex As Exception
+                Return New kWControlEventReturnInfo With {.success = False, .returnMessage = "Failed Due  To :" & ex.Message.ToString}
+            End Try
+        End Function
+        Public Function ReturnDivisionwithCalculationBasis(CheckCalculate As Boolean) As kWControlEventReturnInfo
+            Try
+                Return New kWControlEventReturnInfo With {.success = True, .returnData = CalculationBasisWithUpdateButton(CheckCalculate).ToString}
+            Catch ex As Exception
+                Return New kWControlEventReturnInfo With {.success = False, .returnMessage = "Failed Due To :" & ex.Message.ToString}
+            End Try
+        End Function
+        Public Function GetDivisionFormClienSideEleventhSection(ResolvedCheckBoxValue As Boolean) As kWControlEventReturnInfo
+            Try
+                Return New kWControlEventReturnInfo With {.success = True, .returnData = RawCloseFormEleventhSectionFromClientSide(ResolvedCheckBoxValue).ToString}
+            Catch ex As Exception
+                Return New kWControlEventReturnInfo With {.success = False, .returnMessage = "Failed Due To:" & ex.Message.ToString}
+            End Try
+        End Function
+        ''' <summary>
+        ''' This is 
+        ''' </summary>
+        ''' <param name="Form"></param>
+        Public Sub GetAllControls(Form As HTMLkWFormBase(Of WEBHTML_tskTaskErrors))
+            '002
+            If FormReturnType = 0 And CalculationsOnly = False Then
+                FormStartEditableSecondSection(Form)
+            End If
+            '003 Raw-Start-Editable 
+            If FormReturnType = 1 And CalculationsOnly = False Then
+                RawStartEditableThirdSection(Form)
+            End If
+            '007 Raw Start readonly 
+            If FormReturnType = 2 And CalculationsOnly = False Then
+                RawStartReadOnlySeventhSection(Form)
+            End If
+            '008 Usage Error type Readonly 
+            If Me.ErrorType = 1 And Me.Calculate And FormReturnType = 2 Then
+                UsageErrorTypeReadOnlyEightSection(Form)
+                '009 Rate Error Type Read only 
+            ElseIf Me.ErrorType = 2 And Me.Calculate And FormReturnType = 2 Then
+                RateErrorTypeReadOnlyNinthSection(Form)
+            End If
+            '010 Manual Read Only 
+            If Me.Calculate = False And FormReturnType = 2 Then
+                ManualReadOnlyTenthSection(Form)
+            End If
+            '011 Raw Close - Form 
+            If (FormReturnType = 0) And CalculationsOnly = False Then
+                'RawCloseFormEleventhSection(Form)
+                RawCloseFormEleventhSection(Form)
+            End If   '012 Raw Close Raw
+            If (FormReturnType = 1) And CalculationsOnly = False Then
+                ' RawCloseRawTwelthSection(Form)
+                RawCloseRawTwelthSection(Form)
+            End If
+            '013 Raw Close Raw ReadOnly Resolved
+            If (FormReturnType = 2) And CalculationsOnly = False And Me.Resolved Then
+                'RawClodeRawReadOnlyREsolvedThirteenthSection
+                RawClodeRawReadOnlyREsolvedThirteenthSection(Form)
+            End If
+        End Sub
+
+        Public Sub RawClodeRawReadOnlyREsolvedThirteenthSection(Form As HTMLkWFormBase(Of WEBHTML_tskTaskErrors))
+            Dim RawCloseReadOnlyHeadinga As String = "<b>Resolution Amount" & GiveMeSomeSpace(6) & "Date" & GiveMeSomeSpace(39) & "Note</b>"
+            Dim RawCloseReadOnlyHeadingaText = New HTMLText(RawCloseReadOnlyHeadinga)
+            Form.FormSectionMain.Add(RawCloseReadOnlyHeadingaText)
+            Dim RawCloseReadOnlyValue As String = FormatCurrency(Me.ResolutionAmount) & GiveMeSomeSpace(24) & Format(Me.ResolutionDate, "dd-MMM-yyyy") & GiveMeSomeSpace(24) & Me.ResolutionNote
+            Dim RawCloseReadOnlyValueText = New HTMLText(RawCloseReadOnlyValue)
+            Form.FormSectionMain.Add(RawCloseReadOnlyValueText)
+        End Sub
+        Public Sub RawCloseRawTwelthSection(Form As HTMLkWFormBase(Of WEBHTML_tskTaskErrors))
+            Dim ResolvedTwelth = kWHTMLElementInputCheckBox.Create(Me, Function(c) c.Resolved)
+            ResolvedTwelth.LabelDisplay = False
+            ResolvedTwelth.ID = "ResolvedTwelth"
+            ResolvedTwelth.dataField = "Resolved"
+            ResolvedTwelth.onClickEvent.onAfterTriggerFunctionName = "ResolvedClickTwelth"
+            Form.FormSectionMain.Add("Resolved", ResolvedTwelth)
+            Dim DivRawCloseFormTwelthSection = New HTMLElementDIV(RawCloseRawTwelthSectionFromClientSide(Me.Resolved))
+            DivRawCloseFormTwelthSection.ID = "DivFromClientSideTwelthSectionID"
+            DivRawCloseFormTwelthSection.ClassName = DivRawCloseFormTwelthSection.ClassName & " col-md-9 col-md-offset-3"
+            Form.FormSectionMain.Add(DivRawCloseFormTwelthSection)
+        End Sub
+        Public Function RawCloseRawTwelthSectionFromClientSide(CheckBoxResolvedTwelth As Boolean) As HTMLElementDIV
+            Dim DivControls As New HTMLElementDIV
+            If CheckBoxResolvedTwelth Then
+                Dim ResolvedByID = kWHTMLElementInputSelect.CreateDirect(Me, 1, "ResolvedByID" & Me.ID, GetContactName)
+                ResolvedByID.LabelString = "By"
+                ResolvedByID.dataField = "ResolvedByID"
+                ResolvedByID.Value = Me.ResolvedByID
+                ResolvedByID.NothingInclude = False
+                DivControls.Controls.Add(ResolvedByID)
+                Dim Space = New HTMLText(GiveMeSomeSpace(15))
+                DivControls.Controls.Add(Space)
+                Dim ResolutionAmount = kWHTMLElementInputNumber.Create(Me, Nothing)
+                ResolutionAmount.ID = "ResolutionAmount" & Me.ID
+                ResolutionAmount.NumberType = HTMLElementInputNumber.NumberTypes.currency
+                ResolutionAmount.LabelString = "Amount"
+                ResolutionAmount.dataField = "ResolutionAmount"
+                ResolutionAmount.Value = Me.ResolutionAmount
+                DivControls.Controls.Add(ResolutionAmount)
+                Dim SpaceStringdate As String = GiveMeSomeSpace(8)
+                Dim HtmlTextSpacedate = New HTMLText(SpaceStringdate)
+                DivControls.Controls.Add(HtmlTextSpacedate)
+                Dim ResolutionDate = kWHTMLElementInputCalendar.Create(Me, Function(c) c.ResolutionDate)
+                ResolutionDate.ID = "ResolutionDate" & Me.ID
+                ResolutionDate.LabelDisplay = False
+                ResolutionDate.dataField = "ResolutionDate"
+                ResolutionDate.formatType = kWHTMLElementInputCalendar.CalendarFormatTypes.DataAndTime24hr
+                DivControls.Controls.Add(ResolutionDate)
+                Dim SpaceString As String = GiveMeSomeSpace(26)
+                Dim HtmlTextSpace = New HTMLText(SpaceString)
+                DivControls.Controls.Add(HtmlTextSpace)
+                Dim Resolutionnote = kWHTMLElementInputText.Create(Me, Nothing)
+                Resolutionnote.ID = "Resolutionnote" & Me.ID
+                Resolutionnote.dataField = "ResolutionNote"
+                Resolutionnote.Value = Me.ResolutionNote
+                Resolutionnote.LabelString = "Note"
+                DivControls.Controls.Add(Resolutionnote)
+                DivControls.Controls.Add(Space)
+
+            End If
+            If (Me.Resolved) Then
+                DivControls.StyleDisplay = "block"
+            Else
+                DivControls.StyleDisplay = "none"
+            End If
+            DivControls.Classes.Add("form-inline")
+            Return DivControls
+        End Function
+
+        Public Sub RawCloseFormEleventhSection(Form As HTMLkWFormBase(Of WEBHTML_tskTaskErrors))
+            Dim Resolved = kWHTMLElementInputCheckBox.Create(Me, Function(c) c.Resolved)
+            Resolved.LabelString = "Resolved "
+            Resolved.ID = "Resolved"
+            Resolved.dataField = "Resolved"
+            Resolved.onClickEvent.onAfterTriggerFunctionName = "ResolvedClick"
+            Form.FormSectionMain.Add(Resolved)
+            Dim space As New HTMLText("&nbsp;&nbsp;&nbsp;")
+            Form.FormSectionMain.Add(space)
+            Dim DivRawCloseFormEleventhSectionFromClientSide = New HTMLElementDIV(RawCloseFormEleventhSectionFromClientSide(Me.Resolved))
+            DivRawCloseFormEleventhSectionFromClientSide.ID = "DivFromClientSideEleventhSectionID"
+            DivRawCloseFormEleventhSectionFromClientSide.ClassName = DivRawCloseFormEleventhSectionFromClientSide.ClassName & " col-md-9 col-md-offset-3"
+            Form.FormSectionMain.Add(DivRawCloseFormEleventhSectionFromClientSide)
+
+        End Sub
+        Public Function RawCloseFormEleventhSectionFromClientSide(ResolvedCheckBoxValue As Boolean) As HTMLElementDIV
+            Dim Divcontrols As New HTMLElementDIV
+            If ResolvedCheckBoxValue = True Then
+                Dim ResolvedByID = kWHTMLElementInputSelect.CreateDirect(Me, 0, "ResolvedByID", GetContactName)
+                ResolvedByID.LabelString = "Resolved By"
+                ResolvedByID.dataField = "ResolvedByID"
+                ResolvedByID.StyleWidth = "170px"
+                ResolvedByID.NothingInclude = False
+                ResolvedByID.Value = Me.ResolvedByID
+                ' Dim CalculationsBasis = kWHTMLElementInputSelect.CreateDirect(Me, 0, "CalculationBasis", GetType(tskErrorCalcBasis))
+                'CalculationsBasis.LabelString = "Calculations Basis"
+                'CalculationsBasis.dataField = "ErrorCalculationBasis"
+                'CalculationsBasis.NothingInclude = False
+                'CalculationsBasis.Value = Me.ErrorCalculationBasis
+                If (Me.Resolved) Then
+                    ResolvedByID.StyleDisplay = "block"
+                Else
+                    ResolvedByID.StyleDisplay = "none"
+                End If
+                Divcontrols.Controls.Add(ResolvedByID)
+                Dim ResolutionAmount = kWHTMLElementInputNumber.Create(Me, Nothing)
+                ResolutionAmount.ID = "ResolutionAmount "
+                ResolutionAmount.NumberType = HTMLElementInputNumber.NumberTypes.currency
+                ResolutionAmount.LabelString = "Resolution Amount"
+                ResolutionAmount.dataField = "ResolutionAmount"
+                ResolutionAmount.Value = Me.ResolutionAmount
+                If (Me.Resolved) Then
+                    ResolutionAmount.StyleDisplay = "block"
+                Else
+                    ResolutionAmount.StyleDisplay = "none"
+                End If
+                Divcontrols.Controls.Add(ResolutionAmount)
+                Dim ResolutionDate = kWHTMLElementInputCalendar.Create(Me, Function(c) c.ResolutionDate)
+                ResolutionDate.ID = "ResolutionDate "
+                ResolutionDate.formatType = kWHTMLElementInputCalendar.CalendarFormatTypes.DataAndTime24hr
+                ResolutionDate.dataField = "ResolutionDate"
+                ResolutionDate.LabelString = "Resolution Date"
+                ResolutionDate.Value = Me.ResolutionDate
+                If (Me.Resolved) Then
+                    ResolutionDate.StyleDisplay = "block"
+                Else
+                    ResolutionDate.StyleDisplay = "none"
+                End If
+                Divcontrols.Controls.Add(ResolutionDate)
+                Dim ResolutionNote = kWHTMLElementInputText.Create(Me, Nothing)
+                ResolutionNote.ID = "ResolutionNote"
+                ResolutionNote.dataField = "ResolutionNote"
+                ResolutionNote.LabelString = "Resolution Note"
+                ResolutionNote.Value = Me.ResolutionNote
+                If (Me.Resolved) Then
+                    ResolutionNote.StyleDisplay = "block"
+                Else
+                    ResolutionNote.StyleDisplay = "none"
+                End If
+                Divcontrols.Controls.Add(ResolutionNote)
+            End If
+            Return Divcontrols
+        End Function
+        Public Function GetContactName() As List(Of kWHTMLElementInputSelect.SelectOption)
+            Try
+                Dim Item As New List(Of kWHTMLElementInputSelect.SelectOption)
+                Dim Con
+                Dim ConLst
+                Dim ID = 0
+                ConLst = "0,"
+                For Each Con In Me.User.Company.Contacts
+                    Con = Con.Classobject
+                    If Not Con.Employee Is Nothing Then
+                        If Con.Employee.Employed Then
+                            If ID = 0 Then
+                                ID = 1
+                            Else
+                                ID += 1
+                            End If
+                            Item.Add(New kWHTMLElementInputSelect.SelectOption With {.id = ID, .text = Con.Name})
+                        End If
+                    End If
+                Next
+                Return Item
+            Catch ex As Exception
+                ex.Message.ToString()
+            End Try
+        End Function
+        Public Sub ManualReadOnlyTenthSection(Form As HTMLkWFormBase(Of WEBHTML_tskTaskErrors))
+            Dim FormatAmount As String = FormatCurrency(Me.Amount)
+            Dim ManualTextAmount = kWHTMLElementInputNumber.Create(Me, Nothing)
+            ManualTextAmount.Readonly = True
+            ManualTextAmount.NumberType = HTMLElementInputNumber.NumberTypes.currency
+            ManualTextAmount.LabelString = "Amount"
+            ManualTextAmount.Value = FormatAmount
+            Form.FormSectionMain.Add(ManualTextAmount)
+        End Sub
+        Public Sub RateErrorTypeReadOnlyNinthSection(Form As HTMLkWFormBase(Of WEBHTML_tskTaskErrors))
+            Dim Unit As String = Nothing
+            Dim UsageDesc As String = Nothing
+            Dim UnitValue As String = Nothing
+
+            If Not Me.Charge Is Nothing Then
+                UnitValue = Me.Charge.Unit
+                Unit = Me.Charge.UnitDescription
+                UsageDesc = UsageUnit(Me.Charge.Unit)
+            End If
+            Dim CalculationHeading As String = "<b>Err Rate" & GiveMeSomeSpace(15) & "Act Rate" & GiveMeSomeSpace(16) & "Diff" & GiveMeSomeSpace(29) & "Act Usage" & GiveMeSomeSpace(17) & "Total</b>"
+            Dim CalculationTextHeading = New HTMLText(CalculationHeading)
+            Dim CalculationValues As String = FormatRate(Me.ErrorRate, UnitValue) & GiveMeSomeSpace(10) & "-" & GiveMeSomeSpace(10) & FormatRate(Me.ActualRate, UnitValue) & GiveMeSomeSpace(10) & "=" & GiveMeSomeSpace(10) & FormatRate(Me.ErrorRate - Me.ActualRate, UnitValue) & UsageDesc & GiveMeSomeSpace(10) & "X" & GiveMeSomeSpace(10) & Format(Me.ActualUsage, "#,##0.00") & GiveMeSomeSpace(10) & "=" & GiveMeSomeSpace(10) & FormatCurrency((Me.ErrorRate - Me.ActualRate) * Me.ActualUsage)
+            Dim CalculationTextValues = New HTMLText(CalculationValues)
+            Form.FormSectionMain.Add(CalculationTextHeading)
+            Form.FormSectionMain.Add(CalculationTextValues)
+        End Sub
+        Public Sub UsageErrorTypeReadOnlyEightSection(Form As HTMLkWFormBase(Of WEBHTML_tskTaskErrors))
+
+            Dim Unit As String = Nothing
+            Dim UsageDesc As String = Nothing
+            Dim UnitValue As String = Nothing
+
+            If Not Me.Charge Is Nothing Then
+                UnitValue = Me.Charge.Unit
+                Unit = Me.Charge.UnitDescription
+                UsageDesc = UsageUnit(Me.Charge.Unit)
+            End If
+            Dim CalculationHeading As String = "<b>Err Usage" & GiveMeSomeSpace(20) & "Act Usage" & GiveMeSomeSpace(20) & "Diff" & GiveMeSomeSpace(26) & "Act Rate" & GiveMeSomeSpace(31) & "Total</b>"
+            Dim CalculationTextHeading = New HTMLText(CalculationHeading)
+            Dim CalculationValues As String = Me.ErrorUsage & UsageDesc & GiveMeSomeSpace(10) & "-" & GiveMeSomeSpace(10) & Me.ActualUsage & UsageDesc & GiveMeSomeSpace(10) & "=" & GiveMeSomeSpace(10) & Format(Me.ErrorUsage - Me.ActualUsage, "#,###") & UsageDesc & GiveMeSomeSpace(10) & "X" & GiveMeSomeSpace(10) & FormatRate(Me.ActualRate, UnitValue) & Unit & GiveMeSomeSpace(10) & "=" & GiveMeSomeSpace(10) & FormatCurrency((Me.ErrorUsage - Me.ActualUsage) * Me.ActualRate)
+            Dim CalculationTextValues = New HTMLText(CalculationValues)
+            Form.FormSectionMain.Add(CalculationTextHeading)
+            Form.FormSectionMain.Add(CalculationTextValues)
+        End Sub
+        Public Function GiveMeSomeSpace(Value As Integer) As String
+            Dim nbsp As String = "&nbsp;"
+            Dim nbsp2 = ""
+            Dim Testint As Integer = 0
+            For i = 0 To Value - 1
+                Testint += 1
+                nbsp2 = nbsp + nbsp2
+                Value += 1
+            Next
+            Return nbsp2
+        End Function
+        Public Function FormatRate(Rate, Unit)
+            Select Case Unit
+                Case 1, 2   'This is c/kWh and c/MWh
+                    FormatRate = Format(Rate * 100, "#,##0.000")
+                    'Case 5
+                    '	FormatRate = Format(Rate * 365, "#,##0.0")
+                Case Else
+                    FormatRate = Format(Rate, "#,##0.00")
+            End Select
+        End Function
+        Public Function UsageUnit(Unit)
+            Select Case Unit
+                Case 1, 13
+                    UsageUnit = "kWh"
+                Case 2, 3
+                    UsageUnit = "MWh"
+                Case 6
+                    UsageUnit = "days"
+                Case 10, 11, 12
+                    UsageUnit = "kVA"
+                Case 7, 8, 9
+                    UsageUnit = "kW"
+                Case 4
+                    UsageUnit = "months"
+                Case 5
+                    UsageUnit = "Years"
+            End Select
+
+        End Function
+        Public Function RawStartReadOnlySeventhSection(Form As HTMLkWFormBase(Of WEBHTML_tskTaskErrors))
+            'this section contains image , and i needf to understand this function 
+
+            'for Future 
+        End Function
+
+        Public Function ManualEditable() As HTMLElementDIV
+            Dim DivControls As New HTMLElementDIV
+            Dim Amount = kWHTMLElementInputNumber.Create(Me, Function(c) c.Amount)
+            Amount.ID = "Amount"
+            Amount.LabelString = "Calculations"
+            Amount.dataField = "Amount"
+            Amount.NumberType = HTMLElementInputNumber.NumberTypes.currency
+            DivControls.Controls.Add(Amount)
+            Return DivControls
+        End Function
+        Public Function UsageErrorTypeForthSection() As HTMLElementDIV
+            Dim DivControls As New HTMLElementDIV
+            Dim ClaculationsText = New HTMLElementH4("Calculations")
+            DivControls.Controls.Add(ClaculationsText)
+            Dim DivUsageTypeErrorTable = New HTMLElementDIV(UsageTypeErrorTable)
+            DivUsageTypeErrorTable.ID = "RefreshForCalculationUsageType"
+            DivControls.Controls.Add(DivUsageTypeErrorTable)
+            Return DivControls
+        End Function
+        Public Function RateErrorTypeFifthSection() As HTMLElementDIV
+            Dim DivControls As New HTMLElementDIV
+            Dim ClaculationsText = New HTMLElementH4("Calculations")
+            DivControls.Controls.Add(ClaculationsText)
+            Dim DivUsageTypeErrorTable = New HTMLElementDIV(RateTypeErrorTable)
+            DivUsageTypeErrorTable.ID = "RateErrortypeDivisionID"
+            DivControls.Controls.Add(DivUsageTypeErrorTable)
+            Return DivControls
+        End Function
+        Public Function RateTypeErrorTable() As HTMLElementDIV
+            Dim DivControls As New HTMLElementDIV
+            Try
+                PrvDiffRate = Format(Me.ErrorRate - Me.ActualRate, "#,##0.0000")
+                PrvTotalRate = FormatCurrency((Me.ErrorRate - Me.ActualRate) * Me.ActualUsage)
+                Dim ErrorRate = kWHTMLElementInputNumber.Create(Me, Function(c) c.ErrorRate)
+                ErrorRate.ID = "ErrorRate"
+                ErrorRate.DecimalPlaces = 4
+                ErrorRate.dataField = "ErrorRate"
+                ErrorRate.onAfterUpdateEvent.onAfterTriggerFunctionName = "ChangeValueCalculationOnRate"
+                ErrorRate.LabelString = ""
+                DivControls.Controls.Add(ErrorRate)
+
+                Dim Minus = New HTMLText("&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;")
+                DivControls.Controls.Add(Minus)
+
+                Dim ActualRate = kWHTMLElementInputNumber.Create(Me, Function(c) c.ActualRate)
+                ActualRate.ID = "ActualRate"
+                ActualRate.LabelString = "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"
+                ActualRate.dataField = "ActualRate"
+                ActualRate.DecimalPlaces = 4
+                ActualRate.onAfterUpdateEvent.onAfterTriggerFunctionName = "ChangeValueCalculationOnRate"
+                DivControls.Controls.Add(DivControls)
+
+                Dim EqualTo = New HTMLText("=")
+                DivControls.Controls.Add(EqualTo)
+
+                Dim Difference = kWHTMLElementInputNumber.Create(Me, Function(c) c.PrvDiffRate)
+                Difference.ID = "Difference"
+                Difference.DecimalPlaces = 4
+                Difference.Readonly = True
+                Difference.LabelString = "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"
+                DivControls.Controls.Add(Difference)
+
+                Dim Multiply = New HTMLText("X")
+                DivControls.Controls.Add(Multiply)
+
+                Dim ActualUsage = kWHTMLElementInputNumber.Create(Me, Function(c) c.ActualUsage)
+                ActualUsage.ID = "ActualUsage"
+                ActualUsage.LabelString = "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"
+                ActualUsage.DecimalPlaces = 4
+                ActualUsage.dataField = "ActualUsage"
+                ActualUsage.onAfterUpdateEvent.onAfterTriggerFunctionName = "ChangeValueCalculationOnRate"
+                DivControls.Controls.Add(ActualUsage)
+
+                Dim Total = kWHTMLElementInputNumber.Create(Me, Function(c) c.PrvTotalRate)
+                Total.ID = "Total"
+                Total.LabelString = "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"
+                Total.DecimalPlaces = 2
+                Total.Readonly = True
+                DivControls.Controls.Add(Total)
+
+                DivControls.Classes.Add("form-inline")
+            Catch ex As Exception
+                ex.Message.ToString()
+            End Try
+            Return DivControls
+        End Function
+
+        Public Function UsageTypeErrorTable() As HTMLElementDIV
+            Dim Divcontrols As New HTMLElementDIV
+            Try
+                PrvDiff = Format(Me.ErrorUsage - Me.ActualUsage, "#,###")
+                PrvTotal = PrvDiff * Me.ActualRate
+                Dim ErrUsage = kWHTMLElementInputNumber.Create(Me, Function(c) c.ErrorUsage)
+                ErrUsage.ID = "ErrUsageOnUsage"
+                ErrUsage.LabelString = ""
+                ErrUsage.DecimalPlaces = 4
+                ErrUsage.StyleWidth = "150px"
+                ErrUsage.dataField = "ErrorUsage"
+                ErrUsage.onAfterUpdateEvent.onAfterTriggerFunctionName = "ChangeValueCalculationOnUsage"
+                Divcontrols.Controls.Add(ErrUsage)
+                Dim Spaces1 As New HTMLText("&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;")
+                Divcontrols.Controls.Add(Spaces1)
+                Dim Minus = New HTMLText("-")
+                Divcontrols.Controls.Add(Minus)
+                Dim ActUsage = kWHTMLElementInputNumber.Create(Me, Function(c) c.ActualUsage)
+                ActUsage.LabelString = "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"
+                ActUsage.onAfterUpdateEvent.onAfterTriggerFunctionName = "ChangeValueCalculationOnUsage"
+                ActUsage.ID = "ActUsageOnUsage"
+                ActUsage.DecimalPlaces = 4
+                ActUsage.StyleWidth = "150px"
+                ActUsage.dataField = "ActualUsage"
+                Divcontrols.Controls.Add(ActUsage)
+                Dim Spaces2 As New HTMLText("&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;")
+                Divcontrols.Controls.Add(Spaces2)
+                Dim EqualTo = New HTMLText("=")
+                Divcontrols.Controls.Add(EqualTo)
+                Dim Diff = kWHTMLElementInputNumber.Create(Me, Function(c) c.PrvDiff)
+                Diff.ID = "DiffOnUsage"
+                Diff.DecimalPlaces = 2
+                Diff.StyleWidth = "130px"
+                Diff.Readonly = True
+                Diff.LabelString = "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"
+                Diff.ID = "Diff"
+                Divcontrols.Controls.Add(Diff)
+                Dim Spaces3 As New HTMLText("&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;")
+                Divcontrols.Controls.Add(Spaces3)
+                Dim Multiply = New HTMLText("X")
+                Divcontrols.Controls.Add(Multiply)
+                Dim ActRate = kWHTMLElementInputText.Create(Me, Function(c) c.ActualRate)
+                ActRate.ID = "ActRateOnUsage"
+                ActRate.LabelString = "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"
+                ActRate.onAfterUpdateEvent.onAfterTriggerFunctionName = "ChangeValueCalculationOnUsage"
+                ActRate.dataField = "ActualRate"
+                ActRate.StyleWidth = "150px"
+                Divcontrols.Controls.Add(ActRate)
+                Dim Spaces4 As New HTMLText("&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;")
+                Divcontrols.Controls.Add(Spaces4)
+                Dim Equal2 = New HTMLText("=")
+                Divcontrols.Controls.Add(Equal2)
+                Dim Total = kWHTMLElementInputNumber.Create(Me, Function(c) c.PrvTotal)
+                Total.ID = "TotalOnUsage"
+                Total.LabelString = "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"
+                Total.NumberType = HTMLElementInputNumber.NumberTypes.currency
+                Total.Readonly = True
+                Total.StyleWidth = "150px"
+                Divcontrols.Controls.Add(Total)
+                Divcontrols.Classes.Add("form-inline")
+            Catch ex As Exception
+                ex.Message.ToString()
+            End Try
+            Return Divcontrols
+        End Function
+
+        Public Sub FormStartEditableSecondSection(Form As HTMLkWFormBase(Of WEBHTML_tskTaskErrors))
+            Dim HeadingFirst = New HTMLElementH6("Detailed Below Are The Settings For The Task Error")
+            Form.FormSectionMain.Add(HeadingFirst)
+            Dim Description = kWHTMLElementInputText.Create(Me, Function(c) c.Description)
+            Description.ID = "Description"
+            Description.dataField = "Description"
+            Form.FormSectionMain.Add(Description) 'On Hold 
+            Dim ErrorTypeText = New HTMLElementH5(" <b>Error Type</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;" & ErrType().ToString)
+            Form.FormSectionMain.Add(ErrorTypeText)
+            Dim CalculateError = kWHTMLElementInputCheckBox.Create(Me, Function(c) c.Calculate)
+            CalculateError.ID = "CalculateError"
+            CalculateError.LabelString = "Calculate Error"
+            CalculateError.dataField = "Calculate"
+            CalculateError.onClickEvent.onAfterTriggerFunctionName = "ShowHideCalculationBasisAndUpdateButton"
+            Form.FormSectionMain.Add(CalculateError)
+            Dim space = New HTMLText("&nbsp;")
+            Form.FormSectionMain.Add(space)
+            Dim DivCalculationBasis = New HTMLElementDIV(CalculationBasisWithUpdateButton(Me.Calculate))
+            DivCalculationBasis.ID = "DivCalculationBasis"
+            DivCalculationBasis.ClassName = DivCalculationBasis.ClassName & " col-md-9 col-md-offset-3"
+            If ((Me.AccountError Is Nothing) = False And Me.Calculate) Then
+                DivCalculationBasis.StyleDisplay = "block"
+            Else
+                DivCalculationBasis.StyleDisplay = "none"
+            End If
+            Form.FormSectionMain.Add(DivCalculationBasis)
+        End Sub
+
+        Public Sub RawStartEditableThirdSection(Form As HTMLkWFormBase(Of WEBHTML_tskTaskErrors))
+            Dim DivAlignHorizontly As New HTMLElementDIV
+            Dim Description = kWHTMLElementInputText.Create(Me, Function(c) c.Description)
+            Description.ID = "Description"
+            Description.dataField = "Description"
+            DivAlignHorizontly.Controls.Add(Description)
+
+            Dim DivCalcBasis = New HTMLElementDIV(CalcBasisWithUpdateFunction())
+            DivCalcBasis.ID = "DivCalcBasis"
+            ' DivCalcBasis.ClassName = DivCalcBasis.ClassName & " col-md-9 col-md-offset-3"
+            DivAlignHorizontly.Controls.Add(DivCalcBasis)
+
+            'Dim EreeorType = New HTMLElementH4("<b>Error Type</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;" & ErrType().ToString & "<br>")
+            'DivAlignHorizontly.Controls.Add(EreeorType)
+            Dim ErrorType = kWHTMLElementInputText.Create(Me, Function(c) c.ErrType)
+            ErrorType.Readonly = True
+            ErrorType.LabelString = "&nbsp;&nbsp; Error Type &nbsp;&nbsp;&nbsp;&nbsp;"
+            DivAlignHorizontly.Controls.Add(ErrorType)
+            Dim spaceSome = New HTMLText("<br>")
+            DivAlignHorizontly.Controls.Add(spaceSome)
+            Dim Calc = kWHTMLElementInputCheckBox.Create(Me, Function(c) c.Calculate)
+            Calc.ID = "Calc"
+            Calc.LabelString = "Calc"
+            Calc.dataField = "Calculate"
+            Calc.onClickEvent.onAfterTriggerFunctionName = "ShowHideCalcBasisAndUpdateButton"
+            DivAlignHorizontly.Controls.Add(Calc)
+            Dim DivCalcBasisss = New HTMLElementDIV(CalcBasisWithUpdateButton(Me.Calculate))
+            DivCalcBasisss.ID = "DivCalcBasisss"
+            DivCalcBasisss.ClassName = DivCalcBasisss.ClassName & " col-md-9 col-md-offset-3"
+            DivAlignHorizontly.Controls.Add(DivCalcBasisss)
+            DivAlignHorizontly.Classes.Add("form-inline")
+            Form.FormSectionMain.Add(DivAlignHorizontly)
+        End Sub
+
+        Public Function CalcBasisWithUpdateFunction() As HTMLElementDIV
+            Dim Divcontrol As New HTMLElementDIV
+            Dim ErrorCalculationBasis = kWHTMLElementInputSelect.CreateDirect(Me, 0, "CalculationBasis", GetType(tskErrorCalcBasis))
+            ErrorCalculationBasis.LabelString = "Calc Basis"
+            ErrorCalculationBasis.dataField = "ErrorCalculationBasis"
+            ErrorCalculationBasis.NothingInclude = False
+            ErrorCalculationBasis.Value = Me.ErrorCalculationBasis
+            Divcontrol.Controls.Add(ErrorCalculationBasis)
+            Divcontrol.Controls.Add(New HTMLText("&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"))
+            Dim ButtonUpdate = kWHTMLElementButton.Create(Me, "Update")
+            ButtonUpdate.ID = "ButtonUpdate"
+            ButtonUpdate.ClassName = "btn btn-info"
+            ButtonUpdate.onClickEvent.onAfterTriggerFunctionName = "ButtonUpdatClick"
+            Divcontrol.Controls.Add(ButtonUpdate)
+            Divcontrol.Classes.Add("form-inline")
+            Return Divcontrol
+        End Function
+        Public Function CalculationBasisWithUpdateButton(ShowHideCondition As Boolean) As HTMLElementDIV
+            Dim DivControls As New HTMLElementDIV
+            Dim DivDropDownAndButton As New HTMLElementDIV
+            If ShowHideCondition Then
+                Dim CalculationsBasis = kWHTMLElementInputSelect.CreateDirect(Me, 0, "CalculationBasis", GetType(tskErrorCalcBasis))
+                CalculationsBasis.LabelString = "Calculations Basis "
+                CalculationsBasis.dataField = "ErrorCalculationBasis"
+                CalculationsBasis.NothingInclude = False
+                CalculationsBasis.StyleWidth = "170px"
+                CalculationsBasis.Value = Me.ErrorCalculationBasis
+                DivDropDownAndButton.Controls.Add(CalculationsBasis)
+                Dim ButtonUpdate = kWHTMLElementButton.Create(Me, "Update")
+                ButtonUpdate.ClassName = "btn btn-info"
+                ButtonUpdate.ID = "ButtonUpdate"
+
+                ButtonUpdate.onClickEvent.onAfterTriggerFunctionName = "ButtonUpdatClick"
+                DivDropDownAndButton.Controls.Add(ButtonUpdate)
+                DivControls.Controls.Add(DivDropDownAndButton)
+
+                If Me.ErrorType = 1 And Me.Calculate And (FormReturnType = 0 Or FormReturnType = 1) Then
+                    ' UsageErrorTypeForthSection(Form)
+                    DivControls.Controls.Add(UsageErrorTypeForthSection())
+                End If   '005 Rate Error Type Editable 
+                If Me.ErrorType = 2 And Me.Calculate And (FormReturnType = 0 Or FormReturnType = 1) Then
+                    ' RateErrorTypeFifthSection(Form)
+                    DivControls.Controls.Add(RateErrorTypeFifthSection())
+                End If
+            Else
+                If Me.Calculate = False And (FormReturnType = 0 Or FormReturnType = 1) Then
+                    DivControls.Controls.Add(ManualEditable)
+                End If
+            End If
+            Return DivControls
+        End Function
+
+
+
+        Public Function CalcBasisWithUpdateButton(ShowHideCondition As Boolean) As HTMLElementDIV
+            Dim DivControls As New HTMLElementDIV
+            If ShowHideCondition Then
+                If Me.ErrorType = 1 And Me.Calculate And (FormReturnType = 0 Or FormReturnType = 1) Then
+                    ' UsageErrorTypeForthSection(Form)
+                    DivControls.Controls.Add(UsageErrorTypeForthSection())
+                End If   '005 Rate Error Type Editable 
+                If Me.ErrorType = 2 And Me.Calculate And (FormReturnType = 0 Or FormReturnType = 1) Then
+                    ' RateErrorTypeFifthSection(Form)
+                    DivControls.Controls.Add(RateErrorTypeFifthSection())
+                End If
+            Else
+                If Me.Calculate = False And (FormReturnType = 0 Or FormReturnType = 1) Then
+                    DivControls.Controls.Add(ManualEditable)
+                End If
+            End If
+            Return DivControls
+        End Function
+        Public Function ErrType()
+
+            'If Me.AccountError Is Nothing Then
+            '    With Me.User.Reports_Definitions.Item_By_Name("HTML_Select").ClassObject
+            '        With .CodeObject
+            '            .SetDefaults
+            '            .ID = "ErrorType"
+            '            .kWID = Me.LongID
+            '            .DataField = "ErrorType"
+            '            .Width = "160px"
+            '            .Value = Me.ErrorType
+            '            .List = "0,|1,Usage|2,Rate"
+            '            .OnChange = "With BrowserControl.User.Get_Item_Object(""" & Me.LongID & """, True).ClassObject.Reports_Definitions.Item_By_Name(""LOCALHTML_tskTaskError"").ClassObject" & vbCrLf _
+            '                        & "With .CodeObject" & vbCrLf _
+            '                        & "	.SetDefaults" & vbCrLf _
+            '                        & "	.FormReturnType = 1" & vbCrLf _
+            '                        & "	.CalculationsOnly = True" & vbCrLf _
+            '                        & "End With" & vbCrLf _
+            '                        & "Document.All.Calculations" & Me.ID & ".OuterHTML = .EvaluateAsText(False)" & vbCrLf _
+            '                        & "End With"
+            '        End With
+            '        Return .EvaluateAsText(False)
+            '    End With
+            'Else
+            Select Case Me.ErrorType
+                Case 1
+                    Return "Usage"
+                Case 2
+                    Return "Rate"
+                Case Else
+                    Return "Other"
+            End Select
+            'End If
+        End Function
+        Public Function UpdateValues()
+            Dim TskErr
+            TskErr = Me
+            If TskErr.AccountError Is Nothing Then
+                Exit Function
+            End If
+            With TskErr.AccountError
+                If TskErr.ErrorCalculationBasis = 1 Then        'This is as billed for each error
+                    If .ErrorType = 1 Then  'This is a usage type error
+                        With .AccountCharge
+                            TskErr.ErrorUsage = .Usage          'This is the usage as billed by the retailer
+                            TskErr.ErrorRate = 0                        'THis is not required
+                            TskErr.ActualUsage = .kWUsage           'This is the usage as calculated by Utilacor
+                            If .Usage <> 0 Then TskErr.ActualRate = .ChargeCost / .Usage    'This is the rate as Specified on the retailer account
+                        End With
+                    Else
+                        With .AccountCharge
+                            TskErr.ErrorUsage = 0                       'This is not required
+                            If .Usage <> 0 Then TskErr.ErrorRate = .ChargeCost / .Usage     'This is the rate as Specified on the retailer account
+                            TskErr.ActualUsage = .Usage                     'This is the usage as billed by the retailer
+                            If .kWUsage <> 0 Then TskErr.ActualRate = .kWCharge / .kWUsage      'This is the rate as Specified by kWatch
+                        End With
+                    End If
+                ElseIf TskErr.ErrorCalculationBasis = 2 Then    'This is based on data available to Utilacor
+                    If .ErrorType = 1 Then  'This is a usage type error
+                        With .AccountCharge
+                            TskErr.ErrorUsage = .Usage          'This is the usage as billed by the retailer
+                            TskErr.ErrorRate = 0                        'THis is not required
+                            TskErr.ActualUsage = .kWUsage           'This is the usage as calculated by Utilacor
+                            If .kWUsage <> 0 Then TskErr.ActualRate = .kWCharge / .kWUsage  'This is the rate as Calculated by Utilacor
+                        End With
+                    Else
+                        With .AccountCharge
+                            TskErr.ErrorUsage = 0                       'This is not required
+                            If .Usage <> 0 Then TskErr.ErrorRate = .ChargeCost / .Usage 'This is the rate as Specified on the retailer account
+                            TskErr.ActualUsage = .Usage             'This is the usage as billed by the retailer
+                            If .kWUsage <> 0 Then TskErr.ActualRate = .kWCharge / .kWUsage  'This is the rate as Specified by kWatch
+                        End With
+                    End If
+                End If
+            End With
+            'Document.All("TaskError" & ID).OuterHTML = TskErr.Reports_Definitions.Item_By_Name("LOCALHTML_tskTaskError").ClassObject.EvaluateAsText(False)
+        End Function
+
+
+
+
+
+        ''' <summary>
+        ''' This is the function that is called when you need to refresh the form base object
+        ''' </summary>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Function RefreshFormBase() As String Implements WebForm.RefreshFormBase
+            'Get the report
+            Dim repBase As HTMLkWFormBase(Of WEBHTML_tskTaskErrors) = GetReportBase()
+            'This will exclude the jscript code and other items
+            repBase.RefreshPageCall = True
+            Dim html As New HTMLTextWriterkWatch
+            repBase.ToString(html)
+            'Return the string that contains the main contents of this report with extras
+            Return html.ToString
+        End Function
+#Region "Default Code"
+
+        <ThreadStatic()>
+        Public Shared SharedMe As WEBHTML_tskTaskErrors
+
+        'Private _Entities As Entities
+        '''' <summary>
+        '''' This should only be used when updating properties, not in any other code - when you need the entities you should
+        '''' create it yourself
+        '''' </summary>
+        '''' <value></value>
+        '''' <returns></returns>
+        '''' <remarks></remarks>
+        'Public ReadOnly Property Entities As Entities
+        '    Get
+        '        If Not _Entities Is Nothing Then
+        '            If _Entities.IsDisposed Then
+        '                _Entities = Nothing
+        '            End If
+        '        End If
+        '        If _Entities Is Nothing Then
+        '            _Entities = New Entities(Me.User)
+        '        End If
+
+        '        Return _Entities
+        '    End Get
+        'End Property
+
+        ''' <summary>
+        ''' This can be used to associate an icon with this report that is different to the underlying report
+        ''' You could set this within the SetDefaults, or you could create a get and set componet of the 
+        ''' property and override it
+        ''' </summary>
+        ''' <returns></returns>
+        Public Property ReportIcon As Icons Implements WebForm.ReportIcon
+
+
+        ''' <summary>
+        ''' This is a callback that is called after the report if produced.  The report is a document of type Word, Excel, Email or RTF
+        ''' This depends on the type of report produced
+        ''' </summary>
+        ''' <param name="ReportObj">The Report object</param>
+        ''' <remarks></remarks>
+        Public Sub AfterReportProduce(ByVal ReportObj As Object) Implements defReport_Definitions.defReportDefinitionBase.AfterReportProduce
+        End Sub
+
+        ''' <summary>
+        ''' The callback is called after the file has been saved to kWatch.  The file object is a referances to the filFile object that has 
+        ''' just been saved
+        ''' </summary>
+        ''' <param name="File">The newly saved file</param>
+        ''' <remarks></remarks>
+        Public Sub AfterFileSave(ByVal File As kWatchServer.filFile) Implements defReport_Definitions.defReportDefinitionBase.AfterFileSave
+        End Sub
+
+
+        ''' <summary>
+        ''' This is the web request object that has been passed back from the originating call. This contains
+        ''' information relating to the browser, the call been made and the IIS server that the call came from.
+        ''' This is a copy of the request object that is generated by the server 
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Property Request As UserRequest Implements WebForm.Request
+
+        ''' <summary>
+        ''' This is the WebSite that this request belongs to
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Property Web As webWebSite Implements WebForm.Web
+
+        ''' <summary>
+        ''' This is the webContact that relatest to this request
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Property WebContact As webContactLogin Implements WebForm.WebContact
+
+#Region "Settings"
+
+        ''' <summary>
+        ''' This will return the settings object as a dynamic expando object that you can review and edit.  If you
+        ''' want your settings object casted to a specific type, use the GetSettings function.  Setting an object
+        ''' to this location will also update the settings object for you as well
+        ''' 
+        ''' This will get the settings object for this report object.  Settings objects are unique based on
+        ''' the RunReportID, LoggedInContact (either web or local), The active WebID or web site, a DashboardwidgetID and
+        ''' optionaly a SettingsLocationID that you might choose to use.
+        ''' 
+        ''' So for a kWatch report delivered within kWatch - this would be unique based on RunReportID and contactID only as
+        ''' webID, DashboardwidgetID and SettinglocationID are all nothing
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Property Settings As Object Implements WebForm.Settings
+            Get
+                Return WebManagement.SettingsManagement.GetSettings(Me) ' Newtonsoft.Json.JsonConvert.DeserializeObject(Of ExpandoObject)(Me.SettingsRecord.SettingsObject)
+            End Get
+            Set(value As Object)
+                WebManagement.SettingsManagement.SaveSettings(value, Me)
+            End Set
+        End Property
+
+        ''' <summary>
+        ''' This will return the settings object as a dynamic expando object that you can review and edit.  If you
+        ''' want your settings object casted to a specific type, use the GetSettings function.  Setting an object
+        ''' to this location will also update the settings object for you as well
+        ''' 
+        ''' This will get the settings object for this report object.  Settings objects are unique based on
+        ''' the RunReportID, LoggedInContact (either web or local), The active WebID or web site, a DashboardwidgetID and
+        ''' optionaly a SettingsLocationID that you might choose to use.
+        ''' 
+        ''' So for a kWatch report delivered within kWatch - this would be unique based on RunReportID and contactID only as
+        ''' webID, DashboardwidgetID and SettinglocationID are all nothing
+        ''' </summary>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public Function GetSettings(Of SettingObjectType)() As SettingObjectType Implements WebForm.GetSettings
+
+            Return WebManagement.SettingsManagement.GetSettings(Of SettingObjectType)(Me)
+
+        End Function
+
+        ''' <summary>
+        ''' This will save the settings object to the database
+        ''' </summary>
+        ''' <typeparam name="SettingObjectType"></typeparam>
+        ''' <param name="Obj"></param>
+        ''' <remarks></remarks>
+        Public Sub SaveSettings(Of SettingObjectType)(Obj As SettingObjectType) Implements WebForm.SaveSettings
+
+            WebManagement.SettingsManagement.SaveSettings(Obj, Me)
+
+        End Sub
+
+        ''' <summary>
+        ''' This is a global property that if set - will be used as a reportProperties object by the dash-board component
+        ''' You do not need to set this - and it is set if this report is used as 
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        <kWHTML.kWForms.reportProperty>
+        Public Property DashboardWidgetID As Integer? Implements WebForm.DashboardWidgetID
+        ''' <summary>
+        ''' This will get the settings record for this report object.  Settings objects are created and unique based on
+        ''' the RunReportID, LoggedInContact (either web or local), The active WebID or web site, a dash-board Widget ID and
+        ''' optionaly a SettingsLocationID that you might choose to use.
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public ReadOnly Property SettingsRecord As defReportSetting Implements WebForm.SettingsRecord
+            Get
+                Return WebManagement.SettingsManagement.GetSettingsRecord(Me)
+            End Get
+        End Property
+
+
+        ''' <summary>
+        ''' This will return the guid that is used within the report object
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public ReadOnly Property ReportPropertiesGuid As Guid Implements WebForm.ReportPropertiesGuid
+            Get
+                Return WebManagement.SettingsManagement.getReportPropertiesGuid(Me)
+            End Get
+        End Property
+        ''' <summary>
+        ''' This wil return the report properties object for this report
+        ''' </summary>
+        ''' <value></value>
+        ''' <returns></returns>
+        ''' <remarks></remarks>
+        Public ReadOnly Property ReportProperties As Object Implements WebForm.ReportProperties
+            Get
+                Return WebManagement.SettingsManagement.GetReportProperties(Me)
+            End Get
+        End Property
+#End Region
+
+#End Region
+
+    End Class
+End Namespace
